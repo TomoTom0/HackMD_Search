@@ -1,8 +1,8 @@
-﻿let GLOBAL_envs = {};
+﻿//let GLOBAL_envs = {};
 
 window.onload = async function () {
-    console.log("1");
-    GLOBAL_envs = await readEnv();
+    //GLOBAL_envs = await readEnv();
+    addMenuButton();
     BackupToStorage();
     setInterval(BackupToStorage, 30000);
 }
@@ -15,7 +15,19 @@ document.addEventListener("keydown", async function (e) {
         }
         await searchFromStorage(e.target.value);
     }
+    if (/menu_sideHackMDsearch/.test($(e.target).attr("class")) ) {
+        $(".sidenav.main-sidenav").removeClass("in");
+        $(".sidenav.sidenav-menu").removeClass("in");
+    }
 })
+
+document.addEventListener("click", async function (e) {
+    if (/menu_backupAllNotes/.test($(e.target).attr("class")) ) {
+        await BackupAllNotes();
+        return;
+    }
+})
+
 
 function escape_html(str) {
     if (!str) return;
@@ -42,6 +54,43 @@ async function readEnv(env_file = ".env") {
 }
 
 
+function addMenuButton(){
+    // menu heading
+    const input_head="全文検索";
+    const menu_ul=$("ul .dropdown-menu.list[aria-label=メニュー]");
+    const sep=$("<li>", {role:"presentation", "aria-hidden":"true", class:"divider", id:"sep_TOC"});
+    const heading=$("<li>", {class:"dropdown-header"}).append(input_head);
+    menu_ul.append(sep);
+    menu_ul.append(heading);
+
+    // side menu heading
+    const menu_side_ul=$(".sidenav.sidenav-menu");
+    const side_heading=$("<div>", {class:"divider-header"}).append(input_head);
+    menu_side_ul.append(side_heading);
+
+
+    const input_comps=[{class:"menu_backupAllNotes", text:"Backup All Notes"}];
+    for (input_comp of input_comps){
+        // menu comp
+        const comp=$("<li>", {role:"presentation"});
+        const comp_a=$("<a>", {role:"menuitem", class:input_comp.class, href:"#", tabindex:"-1"});
+        const comp_i=$("<i>", {class:"fa fa-file-text fa-fw"});
+        //comp_a.append(comp_i);
+        comp_a.append(input_comp.text);
+        comp.append(comp_a);
+        menu_ul.append(comp);
+
+        // side menu comp
+        const side_comp=$("<a>", {class:`sidenav-item menu_sideHackMDsearch ${input_comp.class}`,
+            tabindex:"-1", "data-toggle":"modal", "data-target":"#namedRevisionModal"});
+        const side_comp_i=$("<i>", {class:"fa fa-history fa-fw"});
+        const side_span=$("<span>").append(input_comp.text);
+        //side_comp.append(side_comp_i);
+        side_comp.append(side_span);
+        menu_side_ul.append(side_comp);
+    }
+}
+
 
 async function BackupToStorage() {
     if (/\?nav=/.test(location.href)) return;
@@ -51,11 +100,10 @@ async function BackupToStorage() {
     const note_id = location.href.match(/(?<=hackmd.io\/)[^\?]+/)[0];
     //obtain note content with HackMD REST API
     const note_md = await fetch(`${hackmd_url}/${note_id}/download`).then(d => d.text());
-    console.log(note_title);
     // 保存した日付もつけるかはそのうち考える
     chrome.storage.local.get({ "backup": {} }, async (backup_obj) => {
         console.log(backup_obj);
-        backup_obj["backup"][note_id] = note_md;
+        backup_obj["backup"][note_id] = {md:note_md, title:note_title};
         await chrome.storage.local.set({ "backup": backup_obj["backup"] });
     });
 }
@@ -73,6 +121,7 @@ async function BackupAllNotes() {
         console.log(orig_id, id_tmp);
         idAndNotes.push({
             id: id_tmp,
+            title: history.text,
             md: await fetch(`${hackmd_url}/${id_tmp}/download`).then(d => d.text())
         });
     };
@@ -80,7 +129,7 @@ async function BackupAllNotes() {
     chrome.storage.local.clear();
     chrome.storage.local.get({ "backup": {} }, async (backup_obj) => {
         for (const idAndNote of idAndNotes) {
-            backup_obj["backup"][idAndNote.id] = idAndNote.md;
+            backup_obj["backup"][idAndNote.id] = {md:idAndNote.md, title:idAndNote.title};
         }
         await chrome.storage.local.set({ "backup": backup_obj["backup"] });
     })
@@ -93,8 +142,9 @@ function searchQuerySplit(q){
     console.log(escaped_q)
     const escaped_q2=escaped_q.replace(/\s+/g, " ").replace(/^"/g, ' "').split(' "').map((d,ind)=>{
         if (ind%2==0) return d;
-        else d.replace(/ /g, "__SPACE__").replace(/"$/, "");
+        else return d.replace(/ /g, "__SPACE__").replace(/"$/, "");
     }).join("");
+    console.log(escaped_q2)
     return Object.keys(replace_obj).reduce((acc,key)=>acc.split(replace_obj[key]).join(key), escaped_q2)
     .split(" ").map(d=>d.replace(/__SPACE__/g, " "));
 }
@@ -111,7 +161,7 @@ async function searchFromStorage(q_in = "") {
                 if (key=="minus") return result["backup"][id].indexOf(q) == -1;
                 if (key=="reg") return new RegExp(q).test(result["backup"][id]);
             }))}, Object.keys(result["backup"]));
-        await showSearchResult(result_ids, queries["plus"]);
+        await showSearchResult(result_ids, queries);
     });
 }
 
@@ -137,17 +187,17 @@ async function showSearchResult(result_ids, queries) {
     let result_html = !first_search ? "" : constant_part.head + constant_part.ul;
 
     const hackmd_url = "https://hackmd.io";
-    const hackmd_histories = await fetch(`${hackmd_url}/history`).then(d => d.json()).then(d => d["history"]);
 
     chrome.storage.local.get({ "backup": {} }, backup_obj => {
         for (const note_id of result_ids) {
             try {
-                const note_title = escape_html(hackmd_histories.filter(d => d.id == note_id)[0]["text"]);
-                const note_md = backup_obj["backup"][note_id];
+                const note_title = backup_obj["backup"][note_id].title;
+                const note_md = backup_obj["backup"][note_id].md;
                 const note_url = `${hackmd_url}/${note_id.match(/^[^\?]+(?=\??.*$)/)[0]}`;
-                const searched_parts = queries.reduce( (acc,q)=>
+                const queries_tmp= queries.plus.length>0 ? queries.plus : queries.reg.length>0 ? queries.reg : [];
+                const searched_parts = queries_tmp.length==0 ? note_md.slice(0,100) : queries_tmp.reduce( (acc,q)=>
                 acc.concat( note_md.match(new RegExp(`(.|\n){0,30}${q}(.|\n){0,30}`, "gi") )
-                .map(d=>d.replace(new RegExp(q, "gi"),`<span style="color: orange;">${q}</span>`)) ), []).join("......");
+                .map(d=>d.replace(new RegExp(`(${q})`, "gi"),`<span style="color: orange;">$1</span>`)) ), []).join("......");
                 const result_part = `<li class="col-xs-12 col-sm-6 col-md-6 col-lg-4 list-style-none">
                         <div class="overview-card-container" style="height: 234px; overflow:hidden;">
                         <a class="card-anchor" href="${note_url}"></a>
