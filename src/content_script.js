@@ -140,7 +140,7 @@ async function searchFromStorage(q_in = "") {
                 if (key=="plus") return result["store"][id].md.indexOf(q) != -1;
                 if (key=="minus") return result["store"][id].md.indexOf(q) == -1;
                 if (key=="reg") return new RegExp(q).test(result["store"][id].md);
-            }))}, Object.keys(result["store"]));
+            }) ) }, Object.keys(result["store"]) );
         await showSearchResult(result_ids, {"plus":queries.plus, "reg":queries.reg});
     });
 }
