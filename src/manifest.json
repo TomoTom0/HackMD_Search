@@ -3,11 +3,12 @@
   "description": "You can search texts in HackMD",
   "version": "0.2.0.2",
   "manifest_version": 2,
+  "icons":{"48":"img/icon_48dp.png"},
   "content_scripts": [{
     "matches": ["https://hackmd.io/*"],
     "js": ["jquery-3.5.1.min.js", "content_script.js"]
   }],
   "permissions":["*://api.github.com/*", "*://github.com/*", "storage", "unlimitedStorage"],
-  "web_accessible_resources":[".env"],
+  "web_accessible_resources":[""],
   "options_page": "options.html"
 }

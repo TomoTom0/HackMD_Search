@@ -5,6 +5,8 @@
 With this extension, you can search from sentences of your notes in HackMD.
 **To reduce the burden of HackMD server, this extension stores your all notes in Chrome extension cache.**
 
+![](HackMDSearch_sss1.png)
+
 ## Usage
 
 ### Store All Notes
@@ -13,6 +15,8 @@ On initial use, you should store your all notes to this extension cache. There a
 - input `?StoreAllNotes` in the search input field and press Enter,
 
 When you open a note in HackMD, this extension updated the note content in the cache regularly.
+
+![](HackMDsearch_ss5.png)
 
 ### Search
 Input words in the search input field and press Enter, then the results with the search words highlighted will be shown.
@@ -26,9 +30,11 @@ You can utilize some methods and combine them.
 |phrase|"`words`"|words surrounded `"` are not splited even they include spaces|
 |RegEx|reg:`regular expression`|you can use regular expression|
 
+![](HackMDsearch_ss4.png)
+
 ## Caution
 Again **to reduce the burden of HackMD server, this extension stores your all notes in Chrome extension cache.**
-The cache storage may be `10-100 kBytes per note`.
+The cache storage may be `10-1000 kBytes per note`.
 
 ## LICENSE
 

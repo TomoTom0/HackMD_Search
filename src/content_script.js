@@ -88,7 +88,6 @@ async function StoreToStorage() {
     const note_md = await fetch(`${hackmd_url}/${note_id}/download`).then(d => d.text());
     // 保存した日付もつけるかはそのうち考える
     chrome.storage.local.get({ "store": {} }, async (store_obj) => {
-        console.log(store_obj);
         store_obj["store"][note_id] = {md:note_md, title:note_title};
         await chrome.storage.local.set({ "store": store_obj["store"] });
     });
@@ -97,14 +96,11 @@ async function StoreToStorage() {
 async function StoreAllNotes() {
     const hackmd_url = "https://hackmd.io";
     const hackmd_histories = await fetch(`${hackmd_url}/history`).then(d => d.json()).then(d => d["history"]);
-    console.log(hackmd_histories[1])
     let idAndNotes = [];
     for (const history of hackmd_histories) {
         orig_id = history.id;
-        console.log(orig_id);
         const id_tmp = orig_id.match(/^[^\?]+(?=\??.*$)/)[0];
         if (idAndNotes.map(d=>d.id).indexOf(id_tmp)!=-1 || /^@|\//.test(id_tmp)) continue;
-        console.log(orig_id, id_tmp);
         idAndNotes.push({
             id: id_tmp,
             title: history.text,
