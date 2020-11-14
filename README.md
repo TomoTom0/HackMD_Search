@@ -19,7 +19,7 @@ When you open a note in HackMD, this extension updated the note content in the c
 ![](img/HackMDsearch_ss5.png)
 
 ### Search
-Input words in the search input field and press Enter, then the results with the search words highlighted will be shown.
+Input words in the search input field and press Enter, then the results with the highlighted search words will be shown; they are sorted by updated time.
 
 You can utilize some methods and combine them.
 
