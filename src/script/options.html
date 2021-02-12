@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="showport" content="width=device-width, initial-scale=1">
+
+    <title>Option</title>
+
+    <link rel="stylesheet" href="../css/bootstrap.min.css" type="text/css">
+    <link rel="stylesheet" href="../highlight/styles/tomorrow-night.css" type="text/css">
+    <script src="../highlight/highlight.pack.js"></script>
+    <!--<link rel="stylesheet" type="text/css" href="../css/option.css">-->
+
+    <style>
+        .license {
+            font-family: sans-serif;
+        }
+
+        pre {
+            background-color: #eeeeee;
+            padding: 1em;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Forms ================================================== -->
+        <div class="bs-docs-section">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="page-header">
+                        <h1 id="forms">HackMD Search</h1>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-7">
+                    <h2 id="forms">Download Stored Notes</h2>
+                    <h4>Usable even offline or under the HackMD serevr crush </h4>
+                    <div class="well bs-component">
+                        <form class="form-horizontal">
+                            <div class="form-group allNotes">
+                                <span class="h4 displayAllNotesSize">Calculating...</span>
+                                <div class="col-lg-10 col-lg-offset-2">
+                                    <button type="button" class="btnDownloadAllNotes btn btn-primary">Download All
+                                        Notes (.zip)</button>
+                                </div>
+                            </div>
+                            <div class="form-group selectNote">
+                                <input type="text" class="inputNoteTitle" list="noteList" style="width: 300px"
+                                    placeholder="Select/Input a Note Title">
+                                <datalist id="noteList">
+                                </datalist>
+                                </input>
+                                <button type="button" class="btnClear btn btn-primary">Clear Input</button>
+                                <div class="col-lg-10 col-lg-offset-2">
+                                    <button type="button" class="btnShowHideNotes btn btn-primary">SHOW/hide a
+                                        Note</button>
+                                    <button type="button" class="btnCopyNotes btn btn-primary">Copy a Note</button>
+                                    <button type="button" class="btnDownloadNotes btn btn-primary">Download as
+                                        MD</button>
+                                </div>
+                            </div>
+                        </form>
+                        <pre>
+                            <code class="hljs markdown showNotesArea"># The Content of the note will be shown.
+                            </code>
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/jquery-3.5.1.min.js"></script>
+    <script src="../js/zip.min.js"></script>
+    <script src="../script/options.js"></script>
+
+</body>
+
+</html>
