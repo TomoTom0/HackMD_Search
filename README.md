@@ -32,6 +32,7 @@ When you open a note in HackMD, this extension updated the note content in the c
 Input words in the search input field and press Enter, then the results with the highlighted search words will be shown; they are sorted by updated time.
 
 You can utilize some methods and combine them.
+
 全文検索においてはマイナス検索、フレーズ検索、正規表現検索を利用できます。
 
 |method|input|effect|
@@ -45,6 +46,7 @@ You can utilize some methods and combine them.
 
 ### Download and View Stored Notes
 On the option page, you can **view and download sotred notes even offline or under the HackMD server crush**.
+
 オプションページにおいて、**オフライン時やHackMDのサーバーダウン時にも、保存されたノートを閲覧・ダウンロードする**ことができます。
 
 ![](img/HackMDsearch_ss6.png)
