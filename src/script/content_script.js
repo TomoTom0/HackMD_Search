@@ -3,25 +3,38 @@ window.onload = async function () {
     addMenuButton();
     StoreToStorage();
     setInterval(StoreToStorage, 30000);
-}
 
-document.addEventListener("keydown", async function (e) {
-    if (/select-one/.test($(e.target).attr("type")) && e.key == "Enter" && /\?nav=/.test(location.href)) {
-        if (e.target.value == "?StoreAllNotes") {
+    chrome.storage.local.get({lastStoredDate:0 }, async (store_obj) => {
+        if (Date.now() - store_obj.lastStoredDate > 30 * 86400 * 1000) {
             await StoreAllNotes();
-            return;
         }
-        await searchFromStorage(e.target.value);
-    }
-    if (/menu_sideHackMDsearch/.test($(e.target).attr("class"))) {
-        $(".sidenav.main-sidenav").removeClass("in");
-        $(".sidenav.sidenav-menu").removeClass("in");
-    }
-})
+    })
 
-$(".menu_storeAllNotes").on("click", async function () {
-    await StoreAllNotes();
-})
+    document.addEventListener("keydown", async function (e) {
+        if (/select-one/.test($(e.target).attr("type")) && e.key == "Enter" && /\?nav=/.test(location.href)) {
+            if (e.target.value == "?StoreAllNotes") {
+                await StoreAllNotes();
+                return;
+            }
+            await searchFromStorage(e.target.value);
+        }
+        if (/menu_sideHackMDsearch/.test($(e.target).attr("class"))) {
+            $(".sidenav.main-sidenav").removeClass("in");
+            $(".sidenav.sidenav-menu").removeClass("in");
+        }
+    })
+    
+    document.addEventListener("click", async function (e) {
+        console.log($(e.target).attr("class"))
+        if (/menu_storeAllNotes/.test($(e.target).attr("class"))) {
+            await StoreAllNotes();
+        }
+        if (/menu_downloadHTML/.test($(e.target).attr("class"))) {
+            await downloadHTML();
+        }
+    })
+    
+}
 
 
 function escape_html(str) {
@@ -54,8 +67,9 @@ function addMenuButton() {
     const side_heading = $("<div>", { class: "divider-header" }).append(input_head);
     menu_side_ul.append(side_heading);
 
-
     const input_comps = [{ class: "menu_storeAllNotes", text: "Store All Notes" }];
+    // const input_comps = [{ class: "menu_storeAllNotes", text: "Store All Notes" }, {class: "menu_downloadHTML", text:"Download HTML for PDF"}];
+
     for (input_comp of input_comps) {
         // menu comp
         const comp = $("<li>", { role: "presentation" });
@@ -82,16 +96,16 @@ function addMenuButton() {
 
 async function StoreToStorage() {
     if (/\?nav=/.test(location.href)) return;
-    const hackmd_url = "https://hackmd.io"
     //obtain from HackMD DOM
     const note_title = $("head > title").text().match(/^.*(?=\s-\sHackMD$)/)[0].replace(/\s|\//g, "_");
     const note_id = location.href.match(/(?<=hackmd.io\/)[^\?]+/)[0];
     //obtain note content with HackMD REST API
+    const hackmd_url = "https://hackmd.io";
     const note_md = await fetch(`${hackmd_url}/${note_id}/download`).then(d => d.text());
     // 保存した日付もつけるかはそのうち考える
-    chrome.storage.local.get({ "store": {} }, async (store_obj) => {
+    chrome.storage.local.get({ store: {} }, async (store_obj) => {
         store_obj["store"][note_id] = { md: note_md, title: note_title };
-        await chrome.storage.local.set({ "store": store_obj["store"] });
+        await chrome.storage.local.set({ store: store_obj["store"] });
     });
 }
 
@@ -109,15 +123,15 @@ async function StoreAllNotes() {
             md: await fetch(`${hackmd_url}/${id_tmp}/download`).then(d => d.text())
         });
     };
-    console.log(idAndNotes);
+    //console.log(idAndNotes);
     chrome.storage.local.clear();
-    chrome.storage.local.get({ "store": {} }, async (store_obj) => {
+    chrome.storage.local.get({ store: {}, lastStoredDate:0 }, async (store_obj) => {
         for (const idAndNote of idAndNotes) {
             store_obj["store"][idAndNote.id] = { md: idAndNote.md, title: idAndNote.title };
         }
-        await chrome.storage.local.set({ "store": store_obj["store"] });
+        await chrome.storage.local.set({ store: store_obj["store"], lastStoredDate:Date.now() });
     })
-    console.log("Finished");
+    console.log("Backup of All Notes Finished");
 }
 
 function searchQuerySplit(q) {
@@ -178,7 +192,7 @@ async function showSearchResult(result_ids, queries) {
 
     const hackmd_url = "https://hackmd.io";
 
-    chrome.storage.local.get({ "store": {} }, store_obj => {
+    chrome.storage.local.get({ store: {} }, store_obj => {
         for (const note_id of result_ids) {
             try {
                 const note_title = escape_html(store_obj["store"][note_id].title);
@@ -215,8 +229,30 @@ async function showSearchResult(result_ids, queries) {
     });
     $(".TOCsearchResultArea::-webkit-scrollbar").css({ "display": "none" });
 
-
 }
 
+async function downloadHTML(){
+    const html=$("<html>", {lang:"ja"});
+    const head=$("head").clone();
+    const body=$("<body>", {style:"background-color: white; padding-top: 51px;"});
+    const row=$("<div>", {class:"row-ui-content"})
+    const area=$("<div>", {class:"ui-view-area"})
+    const doc=$("#doc").clone();
+    const scripts=$("div.ui-content ~ *").clone()
+    area.append(doc);
+    body.append(row.append(area));
+    scripts.map((ind, obj)=>body.append($(obj).prop("outerHTML")+"\n"));
+    html.append(head.prop("outerHTML")+"\n"+body.prop("outerHTML"));
+    const content=html.prop("outerHTML");
 
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const blob = new Blob([bom, content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.download = "markdown.html";
+    a.href = url;
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
 

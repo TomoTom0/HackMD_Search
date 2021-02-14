@@ -13,21 +13,6 @@ HackMDのサーバーへの負担を軽減するため、この拡張機能は�
 ![](img/HackMDSearch_sss1.png)
 
 ## Usage
-
-### Store All Notes
-On initial use, **you must store your all notes to this extension cache**. There are two methods.
-- Push `Stote All Notes` in the navi menu
-- input `?StoreAllNotes` in the search input field and press Enter,
-
-When you open a note in HackMD, this extension updated the note content in the cache regularly.
-
-はじめて全文検索を利用する場合、**一度すべてのノートをキャッシュに保存する必要があります**。
-- ナビメニューのStore All Notesをクリックする。
-- 検索画面で ?StoreAllNotes と入力してEnterを押す。
-以降は、ノートの内容はキャッシュへ自動的に保存されます。
-
-![](img/HackMDsearch_ss5.png)
-
 ### Search
 Input words in the search input field and press Enter, then the results with the highlighted search words will be shown; they are sorted by updated time.
 
@@ -51,9 +36,23 @@ On the option page, you can **view and download sotred notes even offline or und
 
 ![](img/HackMDsearch_ss6.png)
 
+### Store All Notes
+**Backup of all notes are automatically executed** on the initial use and once per a month.
+You can also store all notes manually. There are two methods.
+- Push `Stote All Notes` in the navi menu
+- input `?StoreAllNotes` in the search input field and press Enter,
+When you open a note in HackMD, this extension updated the note content in the cache regularly.
+
+初回利用時および1ヶ月に1回、ノートの保存は自動的に行われます。
+- ナビメニューのStore All Notesをクリックする。
+- 検索画面で ?StoreAllNotes と入力してEnterを押す。
+以降は、ノートの内容はキャッシュへ自動的に保存されます。
+
+![](img/HackMDsearch_ss5.png)
+
 ## Caution
 Again **to reduce the burden of HackMD server, this extension stores your all notes in Chrome extension cache.**
-The cache storage may be `10-1000 kBytes per note`.
+The whole storage of cache may be `10-1000 kBytes per note`.
 
 ## LICENSE
 
