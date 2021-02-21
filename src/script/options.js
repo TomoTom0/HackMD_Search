@@ -48,7 +48,7 @@ $(async function () {
         // console.log(allNotes)
         // set datalist
         const datalist = $(".selectNote datalist");
-        Object.entries(allNotes).reverse().forEach(kv => {
+        Object.entries(allNotes).sort((a,b)=>b[1].time-a[1].time).forEach(kv => {
             const option = $("<option>")
                 .val(kv[1].title + " ".repeat(5) + "id:" + kv[0]);
             datalist.append(option);
@@ -58,6 +58,33 @@ $(async function () {
             .reduce((acc, cur) => acc + (new Blob([cur.md])).size, 0);
         $(".displayAllNotesSize").html(`${Math.round(allNotesSize / 1024)} KB @ ${allNotesNum} notes`);
     });
+
+    $(".selectSortKey").each((ind, obj)=>{
+        Object.entries({"time: latest":"time +1","time: oldest":"time -1","title: AtoZ":"title +1", "title: ZtoA":"title -1"}).forEach(kv=>{
+            const option=$("<option>").val(kv[1]).text(kv[0]);
+            $(obj).append(option);
+        })
+    })
+
+    document.addEventListener("click", function(e){
+        const e_class=$(e.target).attr("class");
+        if (e_class && e_class.indexOf("selectSortKey")!=-1){
+            const sortKey=$(e.target).val().split(" ")[0];
+            const sortOrder=$(e.target).val().split(" ")[1] - 0;
+            //console.log(sortKey, sortOrder)
+            const datalist = $(".selectNote datalist");
+            datalist.empty();
+            Object.entries(allNotes).sort((a,b)=>{
+                if (["time"].indexOf(sortKey)!=-1){
+                    return sortOrder*(b[1][sortKey]-a[1][sortKey]);
+                } else return (b[1][sortKey]>a[1][sortKey]) ? -1*sortOrder : sortOrder;
+            }).forEach(kv => {
+                const option = $("<option>")
+                    .val(kv[1].title + " ".repeat(5) + "id:" + kv[0]);
+                datalist.append(option);
+            })
+        }
+    })
 
     // check note id
     $(".inputNoteTitle").on("change", function (e) {
@@ -69,7 +96,6 @@ $(async function () {
             const showNotesArea = $(".showNotesArea", e.target.parent);
             showNote(selectedId, allNotes, showNotesArea, noteIsShown);
         } else if (!selectedValue) selectedId = "";
-
     })
     //  toggle shown and hidden
     $(".btnShowHideNotes").on("click", function (e) {
@@ -120,7 +146,7 @@ $(async function () {
             });
         })
         const compressData = zip.compress();
-        const blob = new Blob([compressData], { 'type': 'application/zip' });
+        const blob = new Blob([compressData], { "type": "application/zip" });
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -131,3 +157,4 @@ $(async function () {
         URL.revokeObjectURL(url);
     })
 })
+

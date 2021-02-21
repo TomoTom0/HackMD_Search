@@ -25,13 +25,13 @@ window.onload = async function () {
     })
     
     document.addEventListener("click", async function (e) {
-        console.log($(e.target).attr("class"))
+        //console.log($(e.target).attr("class"))
         if (/menu_storeAllNotes/.test($(e.target).attr("class"))) {
             await StoreAllNotes();
         }
-        if (/menu_downloadHTML/.test($(e.target).attr("class"))) {
+        /*if (/menu_downloadHTML/.test($(e.target).attr("class"))) {
             await downloadHTML();
-        }
+        }*/
     })
     
 }
@@ -102,9 +102,9 @@ async function StoreToStorage() {
     //obtain note content with HackMD REST API
     const hackmd_url = "https://hackmd.io";
     const note_md = await fetch(`${hackmd_url}/${note_id}/download`).then(d => d.text());
-    // 保存した日付もつけるかはそのうち考える
+    // 保存した日付もつけるかはそのうち考える -> つける
     chrome.storage.local.get({ store: {} }, async (store_obj) => {
-        store_obj["store"][note_id] = { md: note_md, title: note_title };
+        store_obj["store"][note_id] = { id:note_id, md: note_md, title: note_title, time:Date.now() };
         await chrome.storage.local.set({ store: store_obj["store"] });
     });
 }
@@ -120,16 +120,18 @@ async function StoreAllNotes() {
         idAndNotes.push({
             id: id_tmp,
             title: history.text,
-            md: await fetch(`${hackmd_url}/${id_tmp}/download`).then(d => d.text())
+            md: await fetch(`${hackmd_url}/${id_tmp}/download`).then(d => d.text()),
+            time: history.time
         });
     };
     //console.log(idAndNotes);
     chrome.storage.local.clear();
     chrome.storage.local.get({ store: {}, lastStoredDate:0 }, async (store_obj) => {
         for (const idAndNote of idAndNotes) {
-            store_obj["store"][idAndNote.id] = { md: idAndNote.md, title: idAndNote.title };
+            store_obj["store"][idAndNote.id] = { md: idAndNote.md, title: idAndNote.title, time:idAndNote.time, id:idAndNote.id };
         }
         await chrome.storage.local.set({ store: store_obj["store"], lastStoredDate:Date.now() });
+        //console.log(store_obj["store"]);
     })
     console.log("Backup of All Notes Finished");
 }
