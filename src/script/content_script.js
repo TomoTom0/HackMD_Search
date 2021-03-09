@@ -1,4 +1,6 @@
-﻿
+﻿"use strict";
+
+// # onload
 window.onload = async function () {
     addMenuButton();
     StoreToStorage();
@@ -52,7 +54,7 @@ function escape_html(str) {
     });
 }
 
-
+// # add button
 function addMenuButton() {
     // menu heading
     const input_head = "全文検索";
@@ -93,12 +95,14 @@ function addMenuButton() {
     }
 }
 
-
+// # store notes
 async function StoreToStorage() {
     if (/\?nav=/.test(location.href)) return;
     //obtain from HackMD DOM
     const note_title = $("head > title").text().match(/^.*(?=\s-\sHackMD$)/)[0].replace(/\s|\//g, "_");
-    const note_id = location.href.match(/(?<=hackmd.io\/)[^\?]+/)[0];
+    const note_idTmp = location.href.match(/(?<=hackmd.io\/)[^\?#@]+/);
+    if (!note_id) return;
+    const note_id=note_idTmp[0];
     //obtain note content with HackMD REST API
     const hackmd_url = "https://hackmd.io";
     const note_md = await fetch(`${hackmd_url}/${note_id}/download`).then(d => d.text());
@@ -115,7 +119,9 @@ async function StoreAllNotes() {
     let idAndNotes = [];
     for (const history of hackmd_histories) {
         orig_id = history.id;
-        const id_tmp = orig_id.match(/^[^\?]+(?=\??.*$)/)[0];
+        const id_tmpTmp = orig_id.match(/^[^\?@#]+(?=\??.*$)/);
+        if (!id_tmpTmp) continue;
+        const id_tmp=id_tmpTmp[0];
         if (idAndNotes.map(d => d.id).indexOf(id_tmp) != -1 || /^@|\//.test(id_tmp)) continue;
         idAndNotes.push({
             id: id_tmp,
@@ -136,6 +142,7 @@ async function StoreAllNotes() {
     console.log("Backup of All Notes Finished");
 }
 
+// # search
 function searchQuerySplit(q) {
     const replace_obj = { "\\\\": "__BACKSLASH__", '\\"': "__WQ__" };
     const escaped_q = Object.keys(replace_obj).reduce((acc, key) => acc.split(key).join(replace_obj[key]), q);
@@ -170,6 +177,7 @@ async function searchFromStorage(q_in = "") {
     });
 }
 
+// ### show search result
 async function showSearchResult(result_ids, queries) {
     const height = 130 + 117 * 2 * (Math.floor(result_ids.length / 2) + 1);
     const height_limited = height > $(window).height() ? $(window).height() : height;
@@ -230,9 +238,9 @@ async function showSearchResult(result_ids, queries) {
 
     });
     $(".TOCsearchResultArea::-webkit-scrollbar").css({ "display": "none" });
-
 }
 
+// # not used
 async function downloadHTML(){
     const html=$("<html>", {lang:"ja"});
     const head=$("head").clone();
