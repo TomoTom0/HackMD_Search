@@ -72,7 +72,7 @@ function addMenuButton() {
     const input_comps = [{ class: "menu_storeAllNotes", text: "Store All Notes" }];
     // const input_comps = [{ class: "menu_storeAllNotes", text: "Store All Notes" }, {class: "menu_downloadHTML", text:"Download HTML for PDF"}];
 
-    for (input_comp of input_comps) {
+    for (const input_comp of input_comps) {
         // menu comp
         const comp = $("<li>", { role: "presentation" });
         const comp_a = $("<a>", { role: "menuitem", class: input_comp.class, href: "#", tabindex: "-1" });
