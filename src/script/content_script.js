@@ -101,7 +101,7 @@ async function StoreToStorage() {
     //obtain from HackMD DOM
     const note_title = $("head > title").text().match(/^.*(?=\s-\sHackMD$)/)[0].replace(/\s|\//g, "_");
     const note_idTmp = location.href.match(/(?<=hackmd.io\/)[^\?#@]+/);
-    if (!note_id) return;
+    if (!note_idTmp) return;
     const note_id=note_idTmp[0];
     //obtain note content with HackMD REST API
     const hackmd_url = "https://hackmd.io";
@@ -118,7 +118,7 @@ async function StoreAllNotes() {
     const hackmd_histories = await fetch(`${hackmd_url}/history`).then(d => d.json()).then(d => d["history"]);
     let idAndNotes = [];
     for (const history of hackmd_histories) {
-        orig_id = history.id;
+        const orig_id = history.id;
         const id_tmpTmp = orig_id.match(/^[^\?@#]+(?=\??.*$)/);
         if (!id_tmpTmp) continue;
         const id_tmp=id_tmpTmp[0];
