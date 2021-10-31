@@ -190,7 +190,7 @@ async function showSearchResult(result_ids, queries) {
             <div style="height: ${height_limited}px; left: 0px; position: absolute; top: 0px; width: 100%;">
             <div class="list-section" style="padding-top: 5px; padding-bottom: 8px;">
             <h1><span>全文検索結果</span></h1>`,
-        ul: `<ul class="list inline-flex flex-row flex-wrap justify-content-start list-style-none pl-0 w-100"
+        ul: `<ul class="list inline-flex hmd-flex-row hmd-flex-wrap justify-content-start hmd-list-style-none hmd-pl-0 hmd-w-100"
         id="list_ul_searchResult">`,
         foot: `</ul></div></div></div>`
     };
@@ -214,13 +214,13 @@ async function showSearchResult(result_ids, queries) {
                             .map(d => q_key == "reg" ? escape_html(d).replace(new RegExp(`(${q})`, "gi"), `<span style="color: orange;">$1</span>`)
                                 : escape_html(d).split(escape_html(q)).join(`<span style="color: orange;">${escape_html(q)}</span>`))), [])
                     ), []).join("......") || note_md.slice(0, 100);
-                const result_part = `<li class="col-xs-12 col-sm-6 col-md-6 col-lg-4 list-style-none">
+                const result_part = `<li class="col-xs-12 col-sm-6 col-md-6 col-lg-4 hmd-list-style-none">
                         <div class="overview-card-container" style="height: 234px; overflow:hidden;">
                         <a class="card-anchor" href="${note_url}"></a>
                         <div class="item" style="height: 220px; overflow:hidden;">
-                        <div class="content text-left pt-1 pr-3/2 pl-3" style="max-height: 220px; overflow:hidden;">
+                        <div class="content hmd-text-left hmd-pt-1 hmd-pr-3/2 hmd-pl-3" style="max-height: 220px; overflow:hidden;">
                         <a href="${note_url}">
-                        <h4 class="ml-0 mt-0 mb-1/2 text flex items-end" title="${note_title}">
+                        <h4 class="hmd-ml-0 hmd-mt-0 hmd-mb-1/2 text hmd-flex hmd-items-end" title="${note_title}">
                     <span class="title">${note_title}</span></h4></a>
                         <a href="${note_url}">${searched_parts}</a></div>`
                 result_html += result_part;
