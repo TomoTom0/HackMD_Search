@@ -1,5 +1,9 @@
 ﻿"use strict";
 
+const operateStorage = (key = null, storageKey = "sync", operate = "get") => new Promise(resolve => {
+    chrome.storage[storageKey][operate](key, resolve);
+});
+
 // # onload
 window.onload = async function () {
     addMenuButton();
@@ -13,22 +17,24 @@ window.onload = async function () {
     })
 
     document.addEventListener("keydown", async function (e) {
-        if (/select-one/.test($(e.target).attr("type")) && e.key == "Enter" && /\?nav=/.test(location.href)) {
-            if (e.target.value == "?StoreAllNotes") {
+        const sps_par = new URLSearchParams(location.search);
+        if (/select-one/.test($(e.target).attr("type")) && e.key == "Enter" && sps_par.has("nav") && sps_par.has("q")) {
+            //if (!sps_par.has("q")) return;
+            const q_val=sps_par.get("q");
+            if (q_val == "?StoreAllNotes") {
                 await StoreAllNotes();
                 return;
             }
-            await searchFromStorage(e.target.value);
+            await searchFromStorage(q_val);
         }
-        if (/menu_sideHackMDsearch/.test($(e.target).attr("class"))) {
+        if ($(e.target).hasClass("menu_sideHackMDsearch")) {
             $(".sidenav.main-sidenav").removeClass("in");
             $(".sidenav.sidenav-menu").removeClass("in");
         }
     })
-    
     document.addEventListener("click", async function (e) {
         //console.log($(e.target).attr("class"))
-        if (/menu_storeAllNotes/.test($(e.target).attr("class"))) {
+        if ($(e.target).hasClass("menu_storeAllNotes")) {
             await StoreAllNotes();
         }
         /*if (/menu_downloadHTML/.test($(e.target).attr("class"))) {
@@ -40,7 +46,7 @@ window.onload = async function () {
 
 
 function escape_html(str) {
-    if (!str) return;
+    if (!str) return "";
     return str.replace(/[<>&"'`]/g, (match) => {
         const escape = {
             '<': '&lt;',
@@ -207,12 +213,15 @@ async function showSearchResult(result_ids, queries) {
             try {
                 const note_title = escape_html(store_obj["store"][note_id].title);
                 const note_md = store_obj["store"][note_id].md;
+                //console.log(note_md);
                 const note_url = `${hackmd_url}/${note_id.match(/^[^\?]+(?=\??.*$)/)[0]}`;
                 const searched_parts = Object.keys(queries).reduce((parts_now, q_key) =>
                     parts_now.concat(queries[q_key].reduce((acc, q) =>
                         acc.concat(note_md.match(new RegExp(`(.|\n){0,20}${q}(.|\n){0,20}`, "gi"))
-                            .map(d => q_key == "reg" ? escape_html(d).replace(new RegExp(`(${q})`, "gi"), `<span style="color: orange;">$1</span>`)
-                                : escape_html(d).split(escape_html(q)).join(`<span style="color: orange;">${escape_html(q)}</span>`))), [])
+                            .map(d => {
+                                //console.log(escape_html(d))
+                                return q_key == "reg" ? escape_html(d).replace(new RegExp(`(${q})`, "gi"), `<span style="color: orange;">$1</span>`)
+                                : escape_html(d).split(escape_html(q)).join(`<span style="color: orange;">${escape_html(q)}</span>`)})), [])
                     ), []).join("......") || note_md.slice(0, 100);
                 const result_part = `<li class="col-xs-12 col-sm-6 col-md-6 col-lg-4 hmd-list-style-none">
                         <div class="overview-card-container" style="height: 234px; overflow:hidden;">
