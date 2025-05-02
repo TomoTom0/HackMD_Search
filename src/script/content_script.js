@@ -18,7 +18,7 @@ window.onload = async function () {
 
     document.addEventListener("keydown", async function (e) {
         const sps_par = new URLSearchParams(location.search);
-        if (/select-one/.test($(e.target).attr("type")) && e.key == "Enter" && sps_par.has("nav") && sps_par.has("q")) {
+        if ($(e.target).hasClass("ui-overview-sidebar-search-input") && e.key == "Enter" && sps_par.has("nav") && sps_par.has("q")) {
             //if (!sps_par.has("q")) return;
             const q_val=sps_par.get("q");
             if (q_val == "?StoreAllNotes") {
@@ -195,7 +195,7 @@ async function showSearchResult(result_ids, queries) {
              style="width: 100%; max-width: 100%; height: ${height_limited}px; overflow-y: auto; overflow-x:hidden; position: relative;">
             <div style="height: ${height_limited}px; left: 0px; position: absolute; top: 0px; width: 100%;">
             <div class="list-section" style="padding-top: 5px; padding-bottom: 8px;">
-            <h1><span>全文検索結果</span></h1>`,
+            <h3 text-h3 leading-h3 m-0 flex gap-[6px] px-1 py-[5px] text-left font-system font-bold text-text-default><span>全文検索結果</span></h3>`,
         ul: `<ul class="list inline-flex hmd-flex-row hmd-flex-wrap justify-content-start hmd-list-style-none hmd-pl-0 hmd-w-100"
         id="list_ul_searchResult">`,
         foot: `</ul></div></div></div>`
@@ -224,22 +224,22 @@ async function showSearchResult(result_ids, queries) {
                                 : escape_html(d).split(escape_html(q)).join(`<span style="color: orange;">${escape_html(q)}</span>`)})), [])
                     ), []).join("......") || note_md.slice(0, 100);
                 const result_part = `<li class="col-xs-12 col-sm-6 col-md-6 col-lg-4 hmd-list-style-none">
-                        <div class="overview-card-container" style="height: 234px; overflow:hidden;">
+                        <div class="bg-background-subtler mr-2\.5 mb-2\.5" style="height: 234px; overflow:hidden;">
                         <a class="card-anchor" href="${note_url}"></a>
                         <div class="item" style="height: 220px; overflow:hidden;">
                         <div class="content hmd-text-left hmd-pt-1 hmd-pr-3/2 hmd-pl-3" style="max-height: 220px; overflow:hidden;">
-                        <a href="${note_url}">
-                        <h4 class="hmd-ml-0 hmd-mt-0 hmd-mb-1/2 text hmd-flex hmd-items-end" title="${note_title}">
+                        <a href="${note_url}" style="text-decoration-color: var(--hmd-tw-text-primary);">
+                        <h4 class="hmd-ml-0 hmd-mt-0 hmd-mb-1/2 text hmd-flex hmd-items-end text-text-primary" title="${note_title}">
                     <span class="title">${note_title}</span></h4></a>
-                        <a href="${note_url}">${searched_parts}</a></div>`
+                        ${searched_parts}</div>`
                 result_html += result_part;
             } catch (e) { console.log(note_id, e); };
         }
         result_html += !first_search ? "" : constant_part.foot;
         if (first_search) {
-            const ov = $(".overview-component");
-            const marker = $("div:eq(0)", ov);
-            marker.after(result_html);
+            const ov = $("section.bg-background-default");
+            const marker = ov.children().last();
+            marker.before(result_html);
         } else {
             const marker = $("#list_ul_searchResult");
             marker.append(result_html);
