@@ -1,7 +1,7 @@
 {
   "name": "HackMD Search",
   "description": "You can search texts in HackMD.",
-  "version": "0.4.1.0",
+  "version": "0.5.1.0",
   "manifest_version": 3,
   "icons":{"48":"img/icon_48dp.png"},
   "content_scripts": [{
