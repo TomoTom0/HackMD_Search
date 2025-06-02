@@ -1,0 +1,13 @@
+
+*:Zone.Identifier
+*.DS_Store
+*.vscode
+*.idea
+*.log
+*.swp
+*.bak
+*.tmp
+
+*.env*
+
+/src.zip
