@@ -11,3 +11,4 @@
 *.env*
 
 /src.zip
+ignored*
