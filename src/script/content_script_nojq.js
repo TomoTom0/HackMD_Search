@@ -16,16 +16,45 @@ const operateStorage = (key = null, storageKey = "sync", operate = "get") => new
     chrome.storage[storageKey][operate](key, resolve);
 });
 
+// history API cache
+let hackmd_idTime_cache = null;
+let hackmd_idTime_cache_time = 0;
+const HACKMD_IDTIME_CACHE_TTL = 30000; // 30秒
+
+async function getHackmdIdTime() {
+    const now = Date.now();
+    if (hackmd_idTime_cache && (now - hackmd_idTime_cache_time) < HACKMD_IDTIME_CACHE_TTL) {
+        return hackmd_idTime_cache;
+    }
+
+    const hackmd_url = "https://hackmd.io";
+    hackmd_idTime_cache = await fetch(`${hackmd_url}/history`).then(d => d.json())
+        .then(d => d["history"].reduce((acc, cur) => Object.assign(acc, { [cur.id]: cur.time }), {}));
+    hackmd_idTime_cache_time = now;
+    return hackmd_idTime_cache;
+}
+
 window.onload = async function () {
     addMenuButton();
     StoreToStorage();
     setInterval(StoreToStorage, 30000);
 
-    chrome.storage.local.get({ lastStoredDate: 0 }, async (store_obj) => {
-        if (Date.now() - store_obj.lastStoredDate > 30 * 86400 * 1000) {
+    try {
+        await hackmdStorage.init();
+
+        // 自動移行を実行（既存ユーザー向け）
+        const migrationResult = await autoMigrate();
+        if (migrationResult.needed && migrationResult.result) {
+            console.log(`[HackMD Search] Migration completed: ${migrationResult.result.migrated} notes migrated.`);
+        }
+
+        const metadata = await hackmdStorage.getMetadata();
+        if (Date.now() - metadata.lastStoredDate > 30 * 86400 * 1000) {
             await StoreAllNotes();
         }
-    });
+    } catch (error) {
+        console.error('Failed to initialize storage:', error);
+    }
 
     document.addEventListener("keydown", async function (e) {
         const sps_par = new URLSearchParams(location.search);
@@ -125,9 +154,11 @@ async function StoreToStorage() {
     const note_id = note_idTmp[0];
     const hackmd_url = "https://hackmd.io";
     const note_md = await fetch(`${hackmd_url}/${note_id}/download`).then(d => d.text());
-    chrome.storage.local.get({ store: {} }, async (store_obj) => {
-        store_obj["store"][note_id] = { id: note_id, md: note_md, title: note_title, time: Date.now() };
-        await chrome.storage.local.set({ store: store_obj["store"] });
+    await hackmdStorage.setNote({
+        id: note_id,
+        md: note_md,
+        title: note_title,
+        time: Date.now()
     });
 }
 
@@ -148,12 +179,19 @@ async function StoreAllNotes() {
             time: history.time
         });
     }
-    chrome.storage.local.clear();
-    chrome.storage.local.get({ store: {}, lastStoredDate: 0 }, async (store_obj) => {
-        for (const idAndNote of idAndNotes) {
-            store_obj["store"][idAndNote.id] = { md: idAndNote.md, title: idAndNote.title, time: idAndNote.time, id: idAndNote.id };
-        }
-        await chrome.storage.local.set({ store: store_obj["store"], lastStoredDate: Date.now() });
+    await hackmdStorage.clear();
+    for (const idAndNote of idAndNotes) {
+        await hackmdStorage.setNote({
+            id: idAndNote.id,
+            md: idAndNote.md,
+            title: idAndNote.title,
+            time: idAndNote.time
+        });
+    }
+    await hackmdStorage.setMetadata({
+        lastStoredDate: Date.now(),
+        noteCount: idAndNotes.length,
+        dbVersion: 1
     });
     console.log("Backup of All Notes Finished");
 }
@@ -174,88 +212,162 @@ async function searchFromStorage(q_in = "") {
     const queries = {
         minus: queries_tmp.filter(d => /^-/.test(d)).map(d => d.slice(1)),
         reg: queries_tmp.filter(d => /^reg:/.test(d)).map(d => d.slice(4)),
+        reg_compiled: [],
         plus: queries_tmp.filter(d => !/^-|^reg:/.test(d)).map(d => d.replace(/^\\(?=(-|reg:))/, ""))
     };
-    chrome.storage.local.get({ "store": {} }, async (result) => {
-        const hackmd_url = "https://hackmd.io";
-        const hackmd_idTime = await fetch(`${hackmd_url}/history`).then(d => d.json())
-            .then(d => d["history"].reduce((acc, cur) => Object.assign(acc, { [cur.id]: cur.time }), {}));
+    // プリコンパイル正規表現
+    queries.reg_compiled = queries.reg.map(pattern => {
+        try {
+            return new RegExp(pattern);
+        } catch (e) {
+            console.error(`Invalid regex: ${pattern}`, e);
+            return null;
+        }
+    }).filter(re => re !== null);
+
+    chrome.storage.local.get({ "store": {} }, async (oldResult) => {
+        const hackmd_idTime = await getHackmdIdTime();
+        const notes = await hackmdStorage.getAllNotes();
+
+        // ノートIDをキーにしたマップを作成
+        const notesMap = {};
+        notes.forEach(note => {
+            notesMap[note.id] = note;
+        });
+
         const result_ids = Object.keys(queries).reduce((acc, key) => {
-            return acc.filter(id => queries[key].every(q => {
-                if (key == "plus") return result["store"][id].md.indexOf(q) != -1;
-                if (key == "minus") return result["store"][id].md.indexOf(q) == -1;
-                if (key == "reg") return new RegExp(q).test(result["store"][id].md);
-            }));
-        }, Object.keys(result["store"]))
+            if (key == "reg_compiled") return acc; // プリコンパイル済みを使用
+            return acc.filter(id => {
+                if (!notesMap[id]) return false;
+                return queries[key].every((q) => {
+                    if (key == "plus") return notesMap[id].md.indexOf(q) != -1;
+                    if (key == "minus") return notesMap[id].md.indexOf(q) == -1;
+                    return true;
+                });
+            });
+        }, Object.keys(notesMap))
+            .filter(id => {
+                if (!notesMap[id]) return false;
+                return queries.reg_compiled.every(re => re.test(notesMap[id].md));
+            })
             .sort((a, b) => -(hackmd_idTime[a] - hackmd_idTime[b]));
-        await showSearchResult(result_ids, { "plus": queries.plus, "reg": queries.reg });
+        await showSearchResult(result_ids, { "plus": queries.plus, "reg": queries.reg_compiled });
     });
 }
 
 async function showSearchResult(result_ids, queries) {
-    const height = 130 + 117 * 2 * (Math.floor(result_ids.length / 2) + 1);
-    const height_limited = height > window.innerHeight ? window.innerHeight : height;
-    const constant_part = {
-        head: `<div aria-label="grid" aria-readonly="true" class="ReactVirtualized__Grid ReactVirtualized__List TOCsearchResultArea"
-        role="grid" tabindex="0" style="box-sizing: border-box; direction: ltr;
-        height: ${height_limited}px; position: relative; width: 100%; will-change: transform; overflow-y: auto;">
-            <div class="ReactVirtualized__Grid__innerScrollContainer TOCsearchResultArea" role="rowgroup"
-             style="width: 100%; max-width: 100%; height: ${height_limited}px; overflow-y: auto; overflow-x:hidden; position: relative;">
-            <div style="height: ${height_limited}px; left: 0px; position: absolute; top: 0px; width: 100%;">
-            <div class="list-section" style="padding-top: 5px; padding-bottom: 8px;">
-            <h3 text-h3 leading-h3 m-0 flex gap-[6px] px-1 py-[5px] text-left font-system font-bold text-text-default><span>全文検索結果</span></h3>` ,
-        ul: `<ul class="list inline-flex hmd-flex-row hmd-flex-wrap justify-content-start hmd-list-style-none hmd-pl-0 hmd-w-100"
-        id="list_ul_searchResult">`,
-        foot: `</ul></div></div></div>`
-    };
-
-    const first_search = document.getElementById("list_ul_searchResult") ? false : true;
-    if (!first_search) document.getElementById("list_ul_searchResult").innerHTML = "";
-
-    let result_html = !first_search ? "" : constant_part.head + constant_part.ul;
     const hackmd_url = "https://hackmd.io";
+    const containerId = "hackmd-search-results";
 
-    chrome.storage.local.get({ store: {} }, store_obj => {
-        for (const note_id of result_ids) {
-            try {
-                const note_title = escape_html(store_obj["store"][note_id].title);
-                const note_md = store_obj["store"][note_id].md;
-                const note_url = `${hackmd_url}/${note_id.match(/^[^\?]+(?=\??.*$)/)[0]}`;
-                const searched_parts = Object.keys(queries).reduce((parts_now, q_key) =>
-                    parts_now.concat(queries[q_key].reduce((acc, q) =>
-                        acc.concat((note_md.match(new RegExp(`(.|\n){0,20}${q}(.|\n){0,20}`, "gi")) || [])
-                            .map(d => {
-                                return q_key == "reg" ? escape_html(d).replace(new RegExp(`(${q})`, "gi"), `<span style="color: orange;">$1</span>`)
-                                    : escape_html(d).split(escape_html(q)).join(`<span style="color: orange;">${escape_html(q)}</span>`);
-                            })), [])
-                    ), []).join("......") || note_md.slice(0, 100);
-                const result_part = `<li class="col-xs-12 col-sm-6 col-md-6 col-lg-4 hmd-list-style-none">
-                        <div class="bg-background-subtler mr-2.5 mb-2.5" style="height: 234px; overflow:hidden;">
-                        <a class="card-anchor" href="${note_url}"></a>
-                        <div class="item" style="height: 220px; overflow:hidden;">
-                        <div class="content hmd-text-left hmd-pt-1 hmd-pr-3/2 hmd-pl-3" style="max-height: 220px; overflow:hidden;">
-                        <a href="${note_url}" style="text-decoration-color: var(--hmd-tw-text-primary);">
-                        <h4 class="hmd-ml-0 hmd-mt-0 hmd-mb-1/2 text hmd-flex hmd-items-end text-text-primary" title="${note_title}">
-                    <span class="title">${note_title}</span></h4></a>
-                        ${searched_parts}</div>`;
-                result_html += result_part;
-            } catch (e) { console.log(note_id, e); }
+    // 既存のコンテナを取得または新規作成
+    let container = document.getElementById(containerId);
+    let resultUl = document.getElementById("list_ul_searchResult");
+
+    if (!container) {
+        // 新規コンテナを作成
+        container = document.createElement("div");
+        container.id = containerId;
+
+        // タイトル（HackMDのスタイルに合わせる）
+        const title = document.createElement("h3");
+        title.className = "font-bold text-text-emphasize mb-0 mt-3 flex items-center gap-1.5";
+        title.innerHTML = `<span>全文検索結果 (${result_ids.length}件)</span>`;
+        container.appendChild(title);
+
+        // 結果リスト（HackMDのグリッドスタイルに合わせる）
+        resultUl = document.createElement("ul");
+        resultUl.id = "list_ul_searchResult";
+        resultUl.className = "list-none grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-3 pl-0 mb-0 mt-3";
+        container.appendChild(resultUl);
+
+        // section.bg-background-defaultの最後の子要素の前に挿入
+        const ov = document.querySelector("section.bg-background-default");
+        if (!ov) {
+            console.error("[HackMD Search] section.bg-background-default not found");
+            return;
         }
-        result_html += !first_search ? "" : constant_part.foot;
-        if (first_search) {
-            const ov = document.querySelector("section.bg-background-default");
-            if (!ov) return;
-            const marker = ov.lastElementChild;
-            if (marker) marker.insertAdjacentHTML("beforebegin", result_html);
+        const marker = ov.lastElementChild;
+        if (marker) {
+            marker.insertAdjacentElement("beforebegin", container);
         } else {
-            const marker = document.getElementById("list_ul_searchResult");
-            if (marker) marker.insertAdjacentHTML("beforeend", result_html);
+            ov.appendChild(container);
         }
+    } else {
+        // 既存の結果をクリア
+        if (resultUl) resultUl.innerHTML = "";
+        // タイトルを更新
+        const title = container.querySelector("h3");
+        if (title) title.innerHTML = `<span>全文検索結果 (${result_ids.length}件)</span>`;
+    }
+
+    const notes = await hackmdStorage.getAllNotes();
+    const notesMap = {};
+    notes.forEach(note => {
+        notesMap[note.id] = note;
     });
-    // Hide scrollbar (not as easy as jQuery, but can be done with CSS)
-    const style = document.createElement('style');
-    style.innerHTML = `.TOCsearchResultArea::-webkit-scrollbar { display: none !important; }`;
-    document.head.appendChild(style);
+
+    // 検索結果を追加
+    const fragment = document.createDocumentFragment();
+    for (const note_id of result_ids) {
+        try {
+            const note = notesMap[note_id];
+            if (!note) continue;
+            const note_title = escape_html(note.title);
+            const note_md = note.md;
+            const note_url = `${hackmd_url}/${note_id.match(/^[^\?]+(?=\??.*$)/)[0]}`;
+
+            // プリコンパイル済み正規表現を使用
+            const searched_parts = Object.keys(queries).reduce((parts_now, q_key) =>
+                parts_now.concat(queries[q_key].reduce((acc, q) => {
+                    if (q_key == "reg") {
+                        // プリコンパイル済み正規表現
+                        const matches = note_md.match(q) || [];
+                        return acc.concat(matches.map(m => {
+                            // プリコンパイル済み正規表現でハイライト
+                            const escaped = escape_html(m);
+                            return escaped.replace(q, (match) => `<span style="color: orange;">${match}</span>`);
+                        }));
+                    } else {
+                        // 文字列一致（plusクエリ）
+                        const pattern = typeof q === "string" ? q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+                        const regex = new RegExp(`(.|\n){0,20}${pattern}(.|\n){0,20}`, "gi");
+                        const matches = note_md.match(regex) || [];
+                        return acc.concat(matches.map(m =>
+                            escape_html(m).split(new RegExp(`(${pattern})`, "gi"))
+                                .join(`<span style="color: orange;">$1</span>`)
+                        ));
+                    }
+                }, []))
+                , []).join(" ... ") || note_md.slice(0, 100);
+
+            // 結果カードを作成（HackMDのスタイルに合わせる）
+            const section = document.createElement("section");
+            section.className = "flex flex-col rounded bg-background-subtler px-4 py-3.5 mb-1";
+
+            const a = document.createElement("a");
+            a.href = note_url;
+            a.className = "text-text-default hocus:text-text-emphasize hocus:no-underline";
+
+            const article = document.createElement("article");
+            article.className = "line-clamp-2 max-w-full overflow-hidden overflow-ellipsis whitespace-normal pt-1.5 [overflow-wrap:anywhere] font-semibold leading-normal text-text-emphasize";
+            article.textContent = note_title;
+
+            const preview = document.createElement("div");
+            preview.className = "text-text-subtler text-sm mt-1 line-clamp-3";
+            preview.innerHTML = searched_parts;
+
+            a.appendChild(article);
+            a.appendChild(preview);
+            section.appendChild(a);
+            fragment.appendChild(section);
+        } catch (e) {
+            console.error("[HackMD Search] Error rendering result:", note_id, e);
+        }
+    }
+
+    if (resultUl) {
+        resultUl.appendChild(fragment);
+    }
 }
 
 // Not used
