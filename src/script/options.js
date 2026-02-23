@@ -253,7 +253,7 @@ const searchSettings = {
     if (btnDownloadAllNotes) {
         btnDownloadAllNotes.addEventListener("click", async function(e) {
             // no stored notes
-            if (allNotes == {}) return;
+            if (Object.keys(allNotes).length === 0) return;
 
             const dirName = "hackMDsearch_AllNotes";
             const zip = new Zlib.Zip();

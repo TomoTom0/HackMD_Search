@@ -195,27 +195,17 @@ class HackMDStorage {
       const transaction = this.db.transaction(['searchIndex'], 'readwrite');
       const store = transaction.objectStore('searchIndex');
 
-      // 既存のインデックスをクリア
+      // トランザクション完了イベントでresolve
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(new Error(`Failed to save search index: ${transaction.error}`));
+
+      // 既存のインデックスをクリアしてから新しいインデックスを保存
       const clearRequest = store.clear();
       clearRequest.onsuccess = () => {
         // 新しいインデックスを保存
         const entries = Object.entries(index.words || {});
-        let completed = 0;
-
-        if (entries.length === 0) {
-          resolve();
-          return;
-        }
-
         entries.forEach(([word, noteIds]) => {
-          const request = store.put({ word, noteIds });
-          request.onsuccess = () => {
-            completed++;
-            if (completed === entries.length) {
-              resolve();
-            }
-          };
-          request.onerror = () => reject(new Error(`Failed to save search index: ${request.error}`));
+          store.put({ word, noteIds });
         });
       };
       clearRequest.onerror = () => reject(new Error(`Failed to clear search index: ${clearRequest.error}`));

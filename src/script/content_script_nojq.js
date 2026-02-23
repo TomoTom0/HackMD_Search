@@ -358,34 +358,32 @@ async function searchFromStorage(q_in = "") {
         }
     }).filter(re => re !== null);
 
-    chrome.storage.local.get({ "store": {} }, async (oldResult) => {
-        const hackmd_idTime = await getHackmdIdTime();
-        const notes = await hackmdStorage.getAllNotes();
+    const hackmd_idTime = await getHackmdIdTime();
+    const notes = await hackmdStorage.getAllNotes();
 
-        // ノートIDをキーにしたマップを作成
-        const notesMap = {};
-        notes.forEach(note => {
-            notesMap[note.id] = note;
-        });
-
-        const result_ids = Object.keys(queries).reduce((acc, key) => {
-            if (key == "reg_compiled") return acc; // プリコンパイル済みを使用
-            return acc.filter(id => {
-                if (!notesMap[id]) return false;
-                return queries[key].every((q) => {
-                    if (key == "plus") return notesMap[id].md.indexOf(q) != -1;
-                    if (key == "minus") return notesMap[id].md.indexOf(q) == -1;
-                    return true;
-                });
-            });
-        }, Object.keys(notesMap))
-            .filter(id => {
-                if (!notesMap[id]) return false;
-                return queries.reg_compiled.every(re => re.test(notesMap[id].md));
-            })
-            .sort((a, b) => -(hackmd_idTime[a] - hackmd_idTime[b]));
-        await showSearchResult(result_ids, { "plus": queries.plus, "reg": queries.reg_compiled });
+    // ノートIDをキーにしたマップを作成
+    const notesMap = {};
+    notes.forEach(note => {
+        notesMap[note.id] = note;
     });
+
+    const result_ids = Object.keys(queries).reduce((acc, key) => {
+        if (key == "reg_compiled") return acc; // プリコンパイル済みを使用
+        return acc.filter(id => {
+            if (!notesMap[id]) return false;
+            return queries[key].every((q) => {
+                if (key == "plus") return notesMap[id].md.indexOf(q) != -1;
+                if (key == "minus") return notesMap[id].md.indexOf(q) == -1;
+                return true;
+            });
+        });
+    }, Object.keys(notesMap))
+        .filter(id => {
+            if (!notesMap[id]) return false;
+            return queries.reg_compiled.every(re => re.test(notesMap[id].md));
+        })
+        .sort((a, b) => -(hackmd_idTime[a] - hackmd_idTime[b]));
+    await showSearchResult(result_ids, { "plus": queries.plus, "reg": queries.reg_compiled });
 }
 
 // グローバル変数：ページング状態
@@ -462,9 +460,21 @@ async function showSearchResult(result_ids, queries) {
     // 設定を取得
     await getSearchSettings();
 
-    // 現在の検索結果を保存
+    // plusクエリの正規表現をプリコンパイル（パフォーマンス最適化）
+    const plus_compiled = (queries.plus || []).map(q => {
+        const pattern = typeof q === "string" ? q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+        return {
+            matchRegex: new RegExp(`(.|\n){0,20}${pattern}(.|\n){0,20}`, "gi"),
+            highlightRegex: new RegExp(`(${pattern})`, "gi")
+        };
+    });
+
+    // 現在の検索結果を保存（プリコンパイル済み正規表現を含む）
     currentSearchResultIds = result_ids;
-    currentSearchQueries = queries;
+    currentSearchQueries = {
+        ...queries,
+        plus_compiled
+    };
     searchResultCurrentPage = 1;
     searchResultTotalPages = Math.ceil(result_ids.length / searchResultPageSize);
 
@@ -586,10 +596,11 @@ async function renderCurrentPage() {
     if (nextButton) nextButton.style.opacity = searchResultCurrentPage >= searchResultTotalPages ? "0.5" : "1";
 
     const hackmd_url = "https://hackmd.io";
-    const notes = await hackmdStorage.getAllNotes();
+    // ページに表示するノートのみを取得（全ノート読み込みを回避）
+    const pageNotes = await Promise.all(pageResultIds.map(id => hackmdStorage.getNote(id)));
     const notesMap = {};
-    notes.forEach(note => {
-        notesMap[note.id] = note;
+    pageNotes.forEach(note => {
+        if (note) notesMap[note.id] = note;
     });
 
     // 検索結果を追加
@@ -603,28 +614,23 @@ async function renderCurrentPage() {
             const note_url = `${hackmd_url}/${note_id.match(/^[^\?]+(?=\??.*$)/)[0]}`;
 
             // プリコンパイル済み正規表現を使用
-            const searched_parts = Object.keys(currentSearchQueries).reduce((parts_now, q_key) =>
-                parts_now.concat(currentSearchQueries[q_key].reduce((acc, q) => {
-                    if (q_key == "reg") {
-                        // プリコンパイル済み正規表現
-                        const matches = note_md.match(q) || [];
-                        return acc.concat(matches.map(m => {
-                            // プリコンパイル済み正規表現でハイライト
-                            const escaped = escape_html(m);
-                            return escaped.replace(q, (match) => `<span style="color: orange;">${match}</span>`);
-                        }));
-                    } else {
-                        // 文字列一致（plusクエリ）
-                        const pattern = typeof q === "string" ? q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-                        const regex = new RegExp(`(.|\n){0,20}${pattern}(.|\n){0,20}`, "gi");
-                        const matches = note_md.match(regex) || [];
-                        return acc.concat(matches.map(m =>
-                            escape_html(m).replace(new RegExp(`(${pattern})`, "gi"),
-                                `<span style="color: orange;">$1</span>`)
-                        ));
-                    }
-                }, []))
-                , []).join(" ... ") || note_md.slice(0, 100);
+            const searched_parts = [
+                // plusクエリ: プリコンパイル済み正規表現を使用
+                ...(currentSearchQueries.plus_compiled || []).reduce((acc, { matchRegex, highlightRegex }) => {
+                    const matches = note_md.match(matchRegex) || [];
+                    return acc.concat(matches.map(m =>
+                        escape_html(m).replace(highlightRegex, `<span style="color: orange;">$1</span>`)
+                    ));
+                }, []),
+                // regクエリ: プリコンパイル済み正規表現を使用
+                ...(currentSearchQueries.reg || []).reduce((acc, regex) => {
+                    const matches = note_md.match(regex) || [];
+                    return acc.concat(matches.map(m => {
+                        const escaped = escape_html(m);
+                        return escaped.replace(regex, (match) => `<span style="color: orange;">${match}</span>`);
+                    }));
+                }, [])
+            ].join(" ... ") || note_md.slice(0, 100);
 
             // 結果カードを作成（HackMDのスタイルに合わせる）
             const section = document.createElement("li");
