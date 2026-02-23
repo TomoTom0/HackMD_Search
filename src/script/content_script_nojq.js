@@ -34,7 +34,9 @@ async function getHackmdIdTime() {
     return hackmd_idTime_cache;
 }
 
-window.onload = async function () {
+// Chrome拡張機能のcontent scriptではwindow.onloadは既に発火済みの場合があるため直接実行
+(async function init() {
+    console.log("[HackMD Search] Initializing...");
     addMenuButton();
     StoreToStorage();
     setInterval(StoreToStorage, 30000);
@@ -56,27 +58,85 @@ window.onload = async function () {
         console.error('Failed to initialize storage:', error);
     }
 
+    // URLパラメータにnav=search&q=xxxがある場合は自動的に検索を実行（検索結果ページ）
+    const sps_par = new URLSearchParams(location.search);
+    if (sps_par.get("nav") === "search" && sps_par.has("q")) {
+        const q_val = sps_par.get("q");
+        if (q_val && q_val !== "?StoreAllNotes") {
+            console.log("[HackMD Search] Auto-searching on search results page for:", q_val);
+            await searchFromStorage(q_val);
+        }
+
+        // 広告非表示設定を確認して、必要に応じて広告を非表示にする
+        chrome.storage.sync.get({ hideUpgradeAds: true }, function(items) {
+            if (items.hideUpgradeAds) {
+                hideUpgradeAds();
+            }
+        });
+    }
+
+    // キャプチャフェーズでイベントを取得して、HackMD標準の検索機能より先に動作するようにする
     document.addEventListener("keydown", async function (e) {
-        const sps_par = new URLSearchParams(location.search);
-        if (hasClass(e.target, "ui-overview-sidebar-search-input") && e.key == "Enter" && sps_par.has("nav") && sps_par.has("q")) {
-            const q_val = sps_par.get("q");
+        if (hasClass(e.target, "ui-overview-sidebar-search-input") && e.key == "Enter") {
+            const q_val = e.target.value.trim();
+            // ?StoreAllNotesコマンドの場合のみ、デフォルトの動作を抑制
             if (q_val == "?StoreAllNotes") {
+                e.preventDefault();
+                e.stopPropagation();
                 await StoreAllNotes();
                 return;
             }
-            await searchFromStorage(q_val);
+            // それ以外の場合は、HackMD標準の検索機能を動作させる（ページ遷移する）
         }
         if (hasClass(e.target, "menu_sideHackMDsearch")) {
             document.querySelectorAll(".sidenav.main-sidenav").forEach(el => el.classList.remove("in"));
             document.querySelectorAll(".sidenav.sidenav-menu").forEach(el => el.classList.remove("in"));
         }
-    });
+    }, true); // キャプチャフェーズでイベントを取得
     document.addEventListener("click", async function (e) {
         if (hasClass(e.target, "menu_storeAllNotes")) {
             await StoreAllNotes();
         }
     });
-};
+
+    // URLの変更を監視して、ページ遷移時に検索結果コンテナを再配置
+    let lastUrl = location.href;
+    setInterval(() => {
+        const url = location.href;
+        if (url !== lastUrl) {
+            lastUrl = url;
+            console.log("[HackMD Search] URL changed:", url);
+            // ページ遷移後の処理
+            setTimeout(() => {
+                // 検索結果ページ（?nav=search&q=xxx）に遷移した場合は検索を実行
+                const sps_par = new URLSearchParams(location.search);
+                if (sps_par.get("nav") === "search" && sps_par.has("q")) {
+                    const q_val = sps_par.get("q");
+                    if (q_val && q_val !== "?StoreAllNotes") {
+                        console.log("[HackMD Search] Auto-searching on URL change for:", q_val);
+                        searchFromStorage(q_val);
+                    }
+                    // 広告非表示設定を確認
+                    chrome.storage.sync.get({ hideUpgradeAds: false }, function(items) {
+                        if (items.hideUpgradeAds) {
+                            hideUpgradeAds();
+                        }
+                    });
+                } else {
+                    // 検索結果ページ以外では、検索結果コンテナを削除
+                    const container = document.getElementById("hackmd-search-results");
+                    if (container) {
+                        console.log("[HackMD Search] Removing container on non-search page");
+                        container.remove();
+                    }
+                }
+            }, 500);
+        }
+    }, 1000);
+
+    console.log("[HackMD Search] Initialization completed");
+})();
+
 
 function escape_html(str) {
     if (!str) return "";
@@ -91,6 +151,68 @@ function escape_html(str) {
         };
         return escape[match];
     });
+}
+
+function showNotification(message, duration = 3000) {
+    // 既存の通知を削除
+    const existingNotification = document.getElementById("hackmd-search-notification");
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    // 通知要素を作成
+    const notification = document.createElement("div");
+    notification.id = "hackmd-search-notification";
+    notification.className = "toast toast-success";
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        background: #4caf50;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 4px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        font-size: 14px;
+        animation: slideIn 0.3s ease-out;
+    `;
+
+    // アニメーション用のスタイルを追加
+    if (!document.getElementById("hackmd-search-notification-style")) {
+        const style = document.createElement("style");
+        style.id = "hackmd-search-notification-style";
+        style.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes fadeOut {
+                from {
+                    opacity: 1;
+                }
+                to {
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    // 指定時間後に通知を削除
+    setTimeout(() => {
+        notification.style.animation = "fadeOut 0.3s ease-out";
+        setTimeout(() => notification.remove(), 300);
+    }, duration);
 }
 
 function addMenuButton() {
@@ -163,8 +285,10 @@ async function StoreToStorage() {
 }
 
 async function StoreAllNotes() {
+    console.log("[HackMD Search] StoreAllNotes started");
     const hackmd_url = "https://hackmd.io";
     const hackmd_histories = await fetch(`${hackmd_url}/history`).then(d => d.json()).then(d => d["history"]);
+    console.log("[HackMD Search] Fetched histories:", hackmd_histories.length, "items");
     let idAndNotes = [];
     for (const history of hackmd_histories) {
         const orig_id = history.id;
@@ -179,7 +303,9 @@ async function StoreAllNotes() {
             time: history.time
         });
     }
+    console.log("[HackMD Search] Filtered notes:", idAndNotes.length, "items");
     await hackmdStorage.clear();
+    console.log("[HackMD Search] IndexedDB cleared");
     for (const idAndNote of idAndNotes) {
         await hackmdStorage.setNote({
             id: idAndNote.id,
@@ -188,12 +314,19 @@ async function StoreAllNotes() {
             time: idAndNote.time
         });
     }
+    console.log("[HackMD Search] All notes saved to IndexedDB");
     await hackmdStorage.setMetadata({
         lastStoredDate: Date.now(),
         noteCount: idAndNotes.length,
         dbVersion: 1
     });
+
+    // 保存を確認
+    const savedNotes = await hackmdStorage.getAllNotes();
+    console.log("[HackMD Search] Verified notes in IndexedDB:", savedNotes.length, "items");
+
     console.log("Backup of All Notes Finished");
+    showNotification(`${idAndNotes.length}件のノートを保存しました`);
 }
 
 function searchQuerySplit(q) {
@@ -255,9 +388,85 @@ async function searchFromStorage(q_in = "") {
     });
 }
 
+// グローバル変数：ページング状態
+let searchResultCurrentPage = 1;
+let searchResultPageSize = 50; // デフォルト値
+let searchResultTotalPages = 1;
+let currentSearchResultIds = [];
+let currentSearchQueries = {};
+
+async function getSearchSettings() {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get({ searchPageSize: 50 }, (result) => {
+            searchResultPageSize = result.searchPageSize;
+            resolve(result.searchPageSize);
+        });
+    });
+}
+
+function hideUpgradeAds() {
+    // 広告セクションを非表示にする
+    // 「Upgrade to Prime」広告を含むセクションを探す
+    const adSections = document.querySelectorAll('section.bg-background-primary-subtler');
+    adSections.forEach(section => {
+        const heading = section.querySelector('h4');
+        if (heading && heading.textContent.includes('Upgrade to Prime')) {
+            section.style.display = 'none';
+            console.log("[HackMD Search] Hidden upgrade ad");
+        }
+    });
+}
+
+function insertSearchResultContainer(container) {
+    // 常に適切な要素に挿入する（ページタイプに関わらず）
+    // まず ui-next-content-neo要素を探す（一覧ページ、検索結果ページなど）
+    let neoElement = document.querySelector('.ui-next-content-neo');
+    if (neoElement) {
+        // navbarの後に挿入するため、navbarを探す
+        const navbar = neoElement.querySelector('.ui-next-navbar-neo-container');
+        if (navbar && navbar.nextSibling) {
+            // navbarの次の要素（コンテンツエリア）を取得
+            const contentArea = navbar.nextSibling;
+            // sticky要素を探して、その後に挿入
+            const stickyElement = contentArea.querySelector('.sticky');
+            if (stickyElement && stickyElement.nextSibling) {
+                contentArea.insertBefore(container, stickyElement.nextSibling);
+            } else if (stickyElement) {
+                // sticky要素が最後の場合
+                contentArea.appendChild(container);
+            } else if (contentArea.firstElementChild) {
+                contentArea.insertBefore(container, contentArea.firstElementChild);
+            } else {
+                contentArea.appendChild(container);
+            }
+        } else {
+            neoElement.insertBefore(container, neoElement.firstElementChild);
+        }
+    } else {
+        // ui-next-content-neoがない場合は、ui-contentクラスを持つ要素を探す（ノートページ）
+        const uiContent = document.querySelector('.ui-content');
+        if (uiContent) {
+            uiContent.insertBefore(container, uiContent.firstElementChild);
+        } else {
+            // フォールバック: body直下に追加
+            document.body.appendChild(container);
+        }
+    }
+}
+
 async function showSearchResult(result_ids, queries) {
+    console.log("[HackMD Search] showSearchResult called, result_ids:", result_ids.length, "queries:", queries);
     const hackmd_url = "https://hackmd.io";
     const containerId = "hackmd-search-results";
+
+    // 設定を取得
+    await getSearchSettings();
+
+    // 現在の検索結果を保存
+    currentSearchResultIds = result_ids;
+    currentSearchQueries = queries;
+    searchResultCurrentPage = 1;
+    searchResultTotalPages = Math.ceil(result_ids.length / searchResultPageSize);
 
     // 既存のコンテナを取得または新規作成
     let container = document.getElementById(containerId);
@@ -267,39 +476,116 @@ async function showSearchResult(result_ids, queries) {
         // 新規コンテナを作成
         container = document.createElement("div");
         container.id = containerId;
+        // HackMDのスタイルに合わせてpaddingとmarginを設定
+        container.style.cssText = "display: block; width: 100%; padding: 0 24px; margin: 1rem 0;";
 
         // タイトル（HackMDのスタイルに合わせる）
         const title = document.createElement("h3");
         title.className = "font-bold text-text-emphasize mb-0 mt-3 flex items-center gap-1.5";
+        title.style.cssText = "font-size: 1.25rem; font-weight: bold; margin: 1rem 0 0.5rem 0; color: rgb(244, 244, 245);";
         title.innerHTML = `<span>全文検索結果 (${result_ids.length}件)</span>`;
         container.appendChild(title);
+
+        // ページング情報エリア
+        const pageInfo = document.createElement("div");
+        pageInfo.id = "hackmd-search-page-info";
+        pageInfo.className = "text-text-subtler text-sm";
+        pageInfo.style.cssText = "color: rgb(161, 161, 170); font-size: 0.875rem; margin: 0.5rem 0;";
+        container.appendChild(pageInfo);
 
         // 結果リスト（HackMDのグリッドスタイルに合わせる）
         resultUl = document.createElement("ul");
         resultUl.id = "list_ul_searchResult";
         resultUl.className = "list-none grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-3 pl-0 mb-0 mt-3";
+        resultUl.style.cssText = "list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(264px, 1fr)); gap: 0.75rem; padding: 0; margin: 0.75rem 0 0 0;";
         container.appendChild(resultUl);
 
-        // section.bg-background-defaultの最後の子要素の前に挿入
-        const ov = document.querySelector("section.bg-background-default");
-        if (!ov) {
-            console.error("[HackMD Search] section.bg-background-default not found");
-            return;
-        }
-        const marker = ov.lastElementChild;
-        if (marker) {
-            marker.insertAdjacentElement("beforebegin", container);
-        } else {
-            ov.appendChild(container);
-        }
+        // ページングコントロール
+        const pagingControls = document.createElement("div");
+        pagingControls.id = "hackmd-search-paging";
+        pagingControls.className = "flex items-center gap-2 mt-3";
+        pagingControls.style.cssText = "display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;";
+
+        // 前へボタン
+        const prevButton = document.createElement("button");
+        prevButton.id = "hackmd-search-prev";
+        prevButton.className = "btn btn-sm btn-default";
+        prevButton.textContent = "前へ";
+        prevButton.style.cssText = "padding: 0.375rem 0.75rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: rgb(60, 60, 65); color: rgb(244, 244, 245); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer;";
+        prevButton.addEventListener("click", () => goToPage(searchResultCurrentPage - 1));
+        pagingControls.appendChild(prevButton);
+
+        // ページ番号表示
+        const pageInfo2 = document.createElement("span");
+        pageInfo2.id = "hackmd-search-page-info-2";
+        pageInfo2.className = "text-text-subtler text-sm";
+        pageInfo2.style.cssText = "color: rgb(161, 161, 170); font-size: 0.875rem;";
+        pagingControls.appendChild(pageInfo2);
+
+        // 次へボタン
+        const nextButton = document.createElement("button");
+        nextButton.id = "hackmd-search-next";
+        nextButton.className = "btn btn-sm btn-default";
+        nextButton.textContent = "次へ";
+        nextButton.style.cssText = "padding: 0.375rem 0.75rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: rgb(60, 60, 65); color: rgb(244, 244, 245); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer;";
+        nextButton.addEventListener("click", () => goToPage(searchResultCurrentPage + 1));
+        pagingControls.appendChild(nextButton);
+
+        container.appendChild(pagingControls);
+
+        // コンテナを配置
+        insertSearchResultContainer(container);
     } else {
         // 既存の結果をクリア
+        console.log("[HackMD Search] Reusing existing container");
         if (resultUl) resultUl.innerHTML = "";
         // タイトルを更新
         const title = container.querySelector("h3");
         if (title) title.innerHTML = `<span>全文検索結果 (${result_ids.length}件)</span>`;
+
+        // ページングコントロールを取得
+        const prevButton = document.getElementById("hackmd-search-prev");
+        const nextButton = document.getElementById("hackmd-search-next");
+        if (prevButton) prevButton.addEventListener("click", () => goToPage(searchResultCurrentPage - 1));
+        if (nextButton) nextButton.addEventListener("click", () => goToPage(searchResultCurrentPage + 1));
     }
 
+    // 現在のページの結果のみレンダリング
+    renderCurrentPage();
+    console.log("[HackMD Search] showSearchResult completed");
+}
+
+async function renderCurrentPage() {
+    const container = document.getElementById("hackmd-search-results");
+    if (!container) return;
+
+    const resultUl = document.getElementById("list_ul_searchResult");
+    if (!resultUl) return;
+
+    // 既存の結果をクリア
+    resultUl.innerHTML = "";
+
+    // ページング情報を更新
+    const startIdx = (searchResultCurrentPage - 1) * searchResultPageSize;
+    const endIdx = Math.min(startIdx + searchResultPageSize, currentSearchResultIds.length);
+    const pageResultIds = currentSearchResultIds.slice(startIdx, endIdx);
+
+    // ページング情報を更新
+    const pageInfo = document.getElementById("hackmd-search-page-info");
+    const pageInfo2 = document.getElementById("hackmd-search-page-info-2");
+    const infoText = `${searchResultCurrentPage} / ${searchResultTotalPages} ページ (${currentSearchResultIds.length}件中 ${startIdx + 1}-${endIdx}件を表示)`;
+    if (pageInfo) pageInfo.textContent = infoText;
+    if (pageInfo2) pageInfo2.textContent = infoText;
+
+    // ボタンの有効/無効を更新
+    const prevButton = document.getElementById("hackmd-search-prev");
+    const nextButton = document.getElementById("hackmd-search-next");
+    if (prevButton) prevButton.disabled = searchResultCurrentPage <= 1;
+    if (nextButton) nextButton.disabled = searchResultCurrentPage >= searchResultTotalPages;
+    if (prevButton) prevButton.style.opacity = searchResultCurrentPage <= 1 ? "0.5" : "1";
+    if (nextButton) nextButton.style.opacity = searchResultCurrentPage >= searchResultTotalPages ? "0.5" : "1";
+
+    const hackmd_url = "https://hackmd.io";
     const notes = await hackmdStorage.getAllNotes();
     const notesMap = {};
     notes.forEach(note => {
@@ -308,7 +594,7 @@ async function showSearchResult(result_ids, queries) {
 
     // 検索結果を追加
     const fragment = document.createDocumentFragment();
-    for (const note_id of result_ids) {
+    for (const note_id of pageResultIds) {
         try {
             const note = notesMap[note_id];
             if (!note) continue;
@@ -317,8 +603,8 @@ async function showSearchResult(result_ids, queries) {
             const note_url = `${hackmd_url}/${note_id.match(/^[^\?]+(?=\??.*$)/)[0]}`;
 
             // プリコンパイル済み正規表現を使用
-            const searched_parts = Object.keys(queries).reduce((parts_now, q_key) =>
-                parts_now.concat(queries[q_key].reduce((acc, q) => {
+            const searched_parts = Object.keys(currentSearchQueries).reduce((parts_now, q_key) =>
+                parts_now.concat(currentSearchQueries[q_key].reduce((acc, q) => {
                     if (q_key == "reg") {
                         // プリコンパイル済み正規表現
                         const matches = note_md.match(q) || [];
@@ -333,40 +619,66 @@ async function showSearchResult(result_ids, queries) {
                         const regex = new RegExp(`(.|\n){0,20}${pattern}(.|\n){0,20}`, "gi");
                         const matches = note_md.match(regex) || [];
                         return acc.concat(matches.map(m =>
-                            escape_html(m).split(new RegExp(`(${pattern})`, "gi"))
-                                .join(`<span style="color: orange;">$1</span>`)
+                            escape_html(m).replace(new RegExp(`(${pattern})`, "gi"),
+                                `<span style="color: orange;">$1</span>`)
                         ));
                     }
                 }, []))
                 , []).join(" ... ") || note_md.slice(0, 100);
 
             // 結果カードを作成（HackMDのスタイルに合わせる）
-            const section = document.createElement("section");
-            section.className = "flex flex-col rounded bg-background-subtler px-4 py-3.5 mb-1";
+            const section = document.createElement("li");
+            section.style.cssText = "display: list-item; list-style: none;";
+
+            const div = document.createElement("div");
+            div.style.cssText = "display: block;";
 
             const a = document.createElement("a");
             a.href = note_url;
-            a.className = "text-text-default hocus:text-text-emphasize hocus:no-underline";
+            a.style.cssText = "display: block; text-decoration: none; color: rgb(212, 212, 216); padding: 0.625rem; border-radius: 0.375rem; border: 1px solid rgba(255, 255, 255, 0.1); transition: background-color 0.15s, border-color 0.15s;";
+            // hover効果を追加
+            a.addEventListener('mouseenter', function() {
+                this.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                this.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            });
+            a.addEventListener('mouseleave', function() {
+                this.style.backgroundColor = 'transparent';
+                this.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            });
 
             const article = document.createElement("article");
-            article.className = "line-clamp-2 max-w-full overflow-hidden overflow-ellipsis whitespace-normal pt-1.5 [overflow-wrap:anywhere] font-semibold leading-normal text-text-emphasize";
+            article.className = "px-1 text-left text-normal leading-normal text-text-emphasize line-clamp-2 max-w-full overflow-hidden overflow-ellipsis whitespace-normal [overflow-wrap:anywhere]";
+            article.style.cssText = "padding-left: 0.25rem; text-align: left; color: rgb(244, 244, 245); display: flow-root; overflow: hidden; overflow-ellipsis; white-space: normal;";
             article.textContent = note_title;
 
             const preview = document.createElement("div");
             preview.className = "text-text-subtler text-sm mt-1 line-clamp-3";
+            preview.style.cssText = "color: rgb(161, 161, 170); font-size: 0.875rem; margin-top: 0.25rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;";
             preview.innerHTML = searched_parts;
 
             a.appendChild(article);
             a.appendChild(preview);
-            section.appendChild(a);
+            div.appendChild(a);
+            section.appendChild(div);
             fragment.appendChild(section);
         } catch (e) {
             console.error("[HackMD Search] Error rendering result:", note_id, e);
         }
     }
 
-    if (resultUl) {
-        resultUl.appendChild(fragment);
+    resultUl.appendChild(fragment);
+    console.log("[HackMD Search] Current page rendered, items:", resultUl.children.length);
+}
+
+function goToPage(pageNum) {
+    if (pageNum < 1 || pageNum > searchResultTotalPages) return;
+    searchResultCurrentPage = pageNum;
+    renderCurrentPage();
+
+    // コンテナまでスクロール
+    const container = document.getElementById("hackmd-search-results");
+    if (container) {
+        container.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 }
 

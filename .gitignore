@@ -14,3 +14,5 @@
 ignored*
 
 .playwright-mcp/
+node_modules/
+tmp/

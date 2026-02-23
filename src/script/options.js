@@ -38,11 +38,62 @@ function strToUtf8Array(strIn) {
     return bytes;
 }
 
+// 検索設定を保存・読み込みする関数
+const searchSettings = {
+    // デフォルト設定
+    defaults: {
+        searchPageSize: 50,
+        hideUpgradeAds: true
+    },
+
+    // 設定を取得
+    get: function(callback) {
+        chrome.storage.sync.get(this.defaults, callback);
+    },
+
+    // 設定を保存
+    set: function(settings, callback) {
+        chrome.storage.sync.set(settings, callback);
+    }
+};
+
 (async function () {
     // init
     let noteIsShown = true;
     let allNotes = {};
     let selectedId = "";
+
+    // 検索設定を初期化
+    searchSettings.get(function(items) {
+        const pageSizeSelect = document.getElementById('searchPageSize');
+        if (pageSizeSelect) {
+            pageSizeSelect.value = items.searchPageSize;
+
+            // 変更時に保存
+            pageSizeSelect.addEventListener('change', function() {
+                searchSettings.set({ searchPageSize: parseInt(pageSizeSelect.value, 10) }, function() {
+                    // 保存完了通知
+                    const status = document.createElement('span');
+                    status.className = 'text-success';
+                    status.textContent = ' Saved!';
+                    status.style.marginLeft = '10px';
+                    pageSizeSelect.parentElement.appendChild(status);
+                    setTimeout(() => status.remove(), 2000);
+                });
+            });
+        }
+
+        // 広告非表示設定
+        const hideAdsCheckbox = document.getElementById('hideUpgradeAds');
+        if (hideAdsCheckbox) {
+            hideAdsCheckbox.checked = items.hideUpgradeAds;
+
+            // 変更時に保存
+            hideAdsCheckbox.addEventListener('change', function() {
+                searchSettings.set({ hideUpgradeAds: hideAdsCheckbox.checked });
+            });
+        }
+    });
 
     try {
         // 自動移行を実行（既存ユーザー向け）

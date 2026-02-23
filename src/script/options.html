@@ -41,6 +41,36 @@
 
             <div class="row">
                 <div class="col-lg-7">
+                    <h2 id="forms">Search Settings</h2>
+                    <h4>Configure search result display</h4>
+                    <div class="well bs-component">
+                        <form class="form-horizontal">
+                            <div class="form-group">
+                                <label class="col-lg-2 control-label">Results per page</label>
+                                <div class="col-lg-10">
+                                    <select id="searchPageSize" class="form-control">
+                                        <option value="20">20 items</option>
+                                        <option value="50">50 items</option>
+                                        <option value="100">100 items</option>
+                                        <option value="200">200 items</option>
+                                    </select>
+                                    <p class="help-block">Number of search results to display per page.</p>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-lg-2 control-label">Hide upgrade ads</label>
+                                <div class="col-lg-10">
+                                    <div class="checkbox">
+                                        <label>
+                                            <input type="checkbox" id="hideUpgradeAds">
+                                            Hide "Upgrade to Prime" advertisement on search results page
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
                     <h2 id="forms">Download Stored Notes</h2>
                     <h4>Usable even offline or under the HackMD serevr crush </h4>
                     <div class="well bs-component">
