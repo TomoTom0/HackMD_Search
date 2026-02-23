@@ -12,3 +12,7 @@
 
 /src.zip
 ignored*
+
+.playwright-mcp/
+node_modules/
+tmp/

@@ -3,11 +3,11 @@
 hljs.initHighlightingOnLoad();
 
 function showNote(noteId, allNotes, showNotesArea, noteIsShown) {
-    if (!noteIsShown) showNotesArea.text("");
+    if (!noteIsShown) showNotesArea.textContent = "";
     else if (Object.keys(allNotes).indexOf(noteId) != -1) {
-        showNotesArea.text(allNotes[noteId].md);
+        showNotesArea.textContent = allNotes[noteId].md;
     }
-    $("pre code").each(function (i, block) {
+    document.querySelectorAll("pre code").forEach(block => {
         hljs.highlightBlock(block);
     });
 }
@@ -16,146 +16,265 @@ function showNote(noteId, allNotes, showNotesArea, noteIsShown) {
 
 function strToUtf8Array(strIn) {
     const strLength = strIn.length;
-    const idx = -1;
     let bytes = [];
-    for (const i = 0; i < strLength; i++) {
-        const c = str.charCodeAt(i);
+    for (let i = 0; i < strLength; i++) {
+        const c = strIn.charCodeAt(i);
         if (c <= 0x7F) {
-            bytes[++idx] = c;
+            bytes.push(c);
         } else if (c <= 0x7FF) {
-            bytes[++idx] = 0xC0 | (c >>> 6);
-            bytes[++idx] = 0x80 | (c & 0x3F);
+            bytes.push(0xC0 | (c >>> 6));
+            bytes.push(0x80 | (c & 0x3F));
         } else if (c <= 0xFFFF) {
-            bytes[++idx] = 0xE0 | (c >>> 12);
-            bytes[++idx] = 0x80 | ((c >>> 6) & 0x3F);
-            bytes[++idx] = 0x80 | (c & 0x3F);
+            bytes.push(0xE0 | (c >>> 12));
+            bytes.push(0x80 | ((c >>> 6) & 0x3F));
+            bytes.push(0x80 | (c & 0x3F));
         } else {
-            bytes[++idx] = 0xF0 | (c >>> 18);
-            bytes[++idx] = 0x80 | ((c >>> 12) & 0x3F);
-            bytes[++idx] = 0x80 | ((c >>> 6) & 0x3F);
-            bytes[++idx] = 0x80 | (c & 0x3F);
+            bytes.push(0xF0 | (c >>> 18));
+            bytes.push(0x80 | ((c >>> 12) & 0x3F));
+            bytes.push(0x80 | ((c >>> 6) & 0x3F));
+            bytes.push(0x80 | (c & 0x3F));
         }
     }
     return bytes;
+}
+
+// 検索設定を保存・読み込みする関数
+const searchSettings = {
+    // デフォルト設定
+    defaults: {
+        searchPageSize: 50,
+        hideUpgradeAds: true
+    },
+
+    // 設定を取得
+    get: function(callback) {
+        chrome.storage.sync.get(this.defaults, callback);
+    },
+
+    // 設定を保存
+    set: function(settings, callback) {
+        chrome.storage.sync.set(settings, callback);
+    }
 };
 
-$(async function () {
+(async function () {
     // init
     let noteIsShown = true;
     let allNotes = {};
     let selectedId = "";
-    chrome.storage.local.get({ "store": {} }, async (store_obj) => {
-        allNotes = store_obj.store;
-        // console.log(allNotes)
-        // set datalist
-        const datalist = $(".selectNote datalist");
-        Object.entries(allNotes).sort((a,b)=>b[1].time-a[1].time).forEach(kv => {
-            const option = $("<option>")
-                .val(kv[1].title + " ".repeat(5) + "id:" + kv[0]);
-            datalist.append(option);
-        })
-        const allNotesNum = Object.keys(allNotes).length;
-        const allNotesSize = Object.values(allNotes)
-            .reduce((acc, cur) => acc + (new Blob([cur.md])).size, 0);
-        $(".displayAllNotesSize").html(`${Math.round(allNotesSize / 1024)} KB @ ${allNotesNum} notes`);
+
+    // 検索設定を初期化
+    searchSettings.get(function(items) {
+        const pageSizeSelect = document.getElementById('searchPageSize');
+        if (pageSizeSelect) {
+            pageSizeSelect.value = items.searchPageSize;
+
+            // 変更時に保存
+            pageSizeSelect.addEventListener('change', function() {
+                searchSettings.set({ searchPageSize: parseInt(pageSizeSelect.value, 10) }, function() {
+                    // 保存完了通知
+                    const status = document.createElement('span');
+                    status.className = 'text-success';
+                    status.textContent = ' Saved!';
+                    status.style.marginLeft = '10px';
+                    pageSizeSelect.parentElement.appendChild(status);
+                    setTimeout(() => status.remove(), 2000);
+                });
+            });
+        }
+
+        // 広告非表示設定
+        const hideAdsCheckbox = document.getElementById('hideUpgradeAds');
+        if (hideAdsCheckbox) {
+            hideAdsCheckbox.checked = items.hideUpgradeAds;
+
+            // 変更時に保存
+            hideAdsCheckbox.addEventListener('change', function() {
+                searchSettings.set({ hideUpgradeAds: hideAdsCheckbox.checked });
+            });
+        }
     });
 
-    $(".selectSortKey").each((ind, obj)=>{
-        Object.entries({"time: latest":"time +1","time: oldest":"time -1","title: AtoZ":"title +1", "title: ZtoA":"title -1"}).forEach(kv=>{
-            const option=$("<option>").val(kv[1]).text(kv[0]);
-            $(obj).append(option);
-        })
-    })
+    try {
+        // 自動移行を実行（既存ユーザー向け）
+        const migrationResult = await autoMigrate();
+        if (migrationResult.needed && migrationResult.result) {
+            console.log(`[HackMD Search] Migration completed: ${migrationResult.result.migrated} notes migrated.`);
+        }
 
-    document.addEventListener("click", function(e){
-        const e_class=$(e.target).attr("class");
-        if (e_class && e_class.indexOf("selectSortKey")!=-1){
-            const sortKey=$(e.target).val().split(" ")[0];
-            const sortOrder=$(e.target).val().split(" ")[1] - 0;
-            //console.log(sortKey, sortOrder)
-            const datalist = $(".selectNote datalist");
-            datalist.empty();
+        // IndexedDBから全ノートを取得
+        const notes = await hackmdStorage.getAllNotes();
+
+        // 配列をマップに変換
+        allNotes = {};
+        notes.forEach(note => {
+            allNotes[note.id] = note;
+        });
+
+        // set datalist
+        const datalist = document.querySelector(".selectNote datalist");
+        Object.entries(allNotes).sort((a,b)=>b[1].time-a[1].time).forEach(kv => {
+            const option = document.createElement("option");
+            option.value = kv[1].title + " ".repeat(5) + "id:" + kv[0];
+            datalist.appendChild(option);
+        });
+
+        // ストレージサイズを表示
+        const storageSize = await hackmdStorage.getStorageSize();
+        const displayElement = document.querySelector(".displayAllNotesSize");
+        if (displayElement) {
+            displayElement.textContent = `${storageSize.kb} KB @ ${storageSize.count} notes`;
+        }
+    } catch (error) {
+        console.error('Failed to load notes:', error);
+        const displayElement = document.querySelector(".displayAllNotesSize");
+        if (displayElement) {
+            displayElement.textContent = 'Error loading notes';
+        }
+    }
+
+    document.querySelectorAll(".selectSortKey").forEach(selectElement => {
+        Object.entries({"time: latest":"time +1","time: oldest":"time -1","title: AtoZ":"title +1", "title: ZtoA":"title -1"}).forEach(kv => {
+            const option = document.createElement("option");
+            option.value = kv[1];
+            option.textContent = kv[0];
+            selectElement.appendChild(option);
+        });
+    });
+
+    document.addEventListener("click", function(e) {
+        const target = e.target;
+        const e_class = target.getAttribute("class");
+        if (e_class && e_class.indexOf("selectSortKey") != -1) {
+            const sortKey = target.value.split(" ")[0];
+            const sortOrder = target.value.split(" ")[1] - 0;
+            const datalist = document.querySelector(".selectNote datalist");
+            datalist.innerHTML = "";
             Object.entries(allNotes).sort((a,b)=>{
                 if (["time"].indexOf(sortKey)!=-1){
                     return sortOrder*(b[1][sortKey]-a[1][sortKey]);
                 } else return (b[1][sortKey]>a[1][sortKey]) ? -1*sortOrder : sortOrder;
             }).forEach(kv => {
-                const option = $("<option>")
-                    .val(kv[1].title + " ".repeat(5) + "id:" + kv[0]);
-                datalist.append(option);
-            })
+                const option = document.createElement("option");
+                option.value = kv[1].title + " ".repeat(5) + "id:" + kv[0];
+                datalist.appendChild(option);
+            });
         }
-    })
+    });
 
     // check note id
-    $(".inputNoteTitle").on("change", function (e) {
-        const selectedValue = $(e.target).val();
-        if (/\s{5}id:\S+$/.test(selectedValue)) {
-            // obtain note id
-            selectedId = selectedValue.match(/(?<=\s{5}id:)\S+$/)[0];
-            $(e.target).val(selectedValue.replace(/\s{5}id:\S+$/, ""));
-            const showNotesArea = $(".showNotesArea", e.target.parent);
-            showNote(selectedId, allNotes, showNotesArea, noteIsShown);
-        } else if (!selectedValue) selectedId = "";
-    })
-    //  toggle shown and hidden
-    $(".btnShowHideNotes").on("click", function (e) {
-        noteIsShown = !noteIsShown;
-        const newText = (noteIsShown ? "SHOW/hide" : "HIDE/show") + " a Note";
-        $(e.target).text(newText);
-        const showNotesArea = $(".showNotesArea", e.target.parent);
-        showNote(selectedId, allNotes, showNotesArea, noteIsShown);
-    })
-    $(".btnClear").on("click", function (e) {
-        $(".inputNoteTitle", e.target.parent).val("");
-    })
+    const inputNoteTitle = document.querySelector(".inputNoteTitle");
+    if (inputNoteTitle) {
+        inputNoteTitle.addEventListener("change", function(e) {
+            const selectedValue = e.target.value;
+            if (/\s{5}id:\S+$/.test(selectedValue)) {
+                // obtain note id
+                selectedId = selectedValue.match(/(?<=\s{5}id:)\S+$/)[0];
+                e.target.value = selectedValue.replace(/\s{5}id:\S+$/, "");
+                const parentForm = e.target.closest("form");
+                if (parentForm) {
+                    const showNotesArea = parentForm.querySelector(".showNotesArea");
+                    if (showNotesArea) {
+                        showNote(selectedId, allNotes, showNotesArea, noteIsShown);
+                    }
+                }
+            } else if (!selectedValue) selectedId = "";
+        });
+    }
+
+    // toggle shown and hidden
+    const btnShowHideNotes = document.querySelector(".btnShowHideNotes");
+    if (btnShowHideNotes) {
+        btnShowHideNotes.addEventListener("click", function(e) {
+            noteIsShown = !noteIsShown;
+            const newText = (noteIsShown ? "SHOW/hide" : "HIDE/show") + " a Note";
+            e.target.textContent = newText;
+            const parentForm = e.target.closest("form");
+            if (parentForm) {
+                const showNotesArea = parentForm.querySelector(".showNotesArea");
+                if (showNotesArea) {
+                    showNote(selectedId, allNotes, showNotesArea, noteIsShown);
+                }
+            }
+        });
+    }
+
+    const btnClear = document.querySelector(".btnClear");
+    if (btnClear) {
+        btnClear.addEventListener("click", function(e) {
+            const parentForm = e.target.closest("form");
+            if (parentForm) {
+                const input = parentForm.querySelector(".inputNoteTitle");
+                if (input) input.value = "";
+            }
+        });
+    }
+
     // copy to clipboard
-    $(".btnCopyNotes").on("click", async function (e) {
-        const showNotesArea = $(".showNotesArea", e.target.parent);
-        const noteContent = showNotesArea.text();
-        await navigator.clipboard.writeText(noteContent);
-    })
+    const btnCopyNotes = document.querySelector(".btnCopyNotes");
+    if (btnCopyNotes) {
+        btnCopyNotes.addEventListener("click", async function(e) {
+            const parentForm = e.target.closest("form");
+            if (parentForm) {
+                const showNotesArea = parentForm.querySelector(".showNotesArea");
+                if (showNotesArea) {
+                    const noteContent = showNotesArea.textContent;
+                    await navigator.clipboard.writeText(noteContent);
+                }
+            }
+        });
+    }
+
     // download as md
-    $(".btnDownloadNotes").on("click", async function (e) {
-        // empty note id is invalid
-        if (!selectedId) return;
-        const showNotesArea = $(".showNotesArea", e.target.parent);
-        const noteContent = showNotesArea.text();
-        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-        const blob = new Blob([bom, noteContent], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.download = allNotes[selectedId].title + ".md";
-        a.href = url;
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    })
+    const btnDownloadNotes = document.querySelector(".btnDownloadNotes");
+    if (btnDownloadNotes) {
+        btnDownloadNotes.addEventListener("click", async function(e) {
+            // empty note id is invalid
+            if (!selectedId) return;
+            const parentForm = e.target.closest("form");
+            if (!parentForm) return;
+            const showNotesArea = parentForm.querySelector(".showNotesArea");
+            if (!showNotesArea) return;
+            const noteContent = showNotesArea.textContent;
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+            const blob = new Blob([bom, noteContent], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.download = allNotes[selectedId].title + ".md";
+            a.href = url;
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    }
+
     // download all notes as zip
-    $(".btnDownloadAllNotes").on("click", async function (e) {
-        // no stored notes
-        if (allNotes == {}) return;
+    const btnDownloadAllNotes = document.querySelector(".btnDownloadAllNotes");
+    if (btnDownloadAllNotes) {
+        btnDownloadAllNotes.addEventListener("click", async function(e) {
+            // no stored notes
+            if (Object.keys(allNotes).length === 0) return;
 
-        const dirName = "hackMDsearch_AllNotes"
-        const zip = new Zlib.Zip();
-        Object.entries(allNotes).slice(10).forEach(kv => {
-            const noteId = kv[0];
-            const note = kv[1];
-            const plainData = note.md;
-            zip.addFile(strToUtf8Array(plainData), {
-                filename: strToUtf8Array(`${dirName}/${note.title}__${noteId}.md`)
+            const dirName = "hackMDsearch_AllNotes";
+            const zip = new Zlib.Zip();
+            Object.entries(allNotes).forEach(kv => {
+                const noteId = kv[0];
+                const note = kv[1];
+                const plainData = note.md;
+                zip.addFile(strToUtf8Array(plainData), {
+                    filename: strToUtf8Array(`${dirName}/${note.title}__${noteId}.md`)
+                });
             });
-        })
-        const compressData = zip.compress();
-        const blob = new Blob([compressData], { "type": "application/zip" });
+            const compressData = zip.compress();
+            const blob = new Blob([compressData], { "type": "application/zip" });
 
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.download = `${dirName}.zip`;
-        a.href = url;
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    })
-})
-
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.download = `${dirName}.zip`;
+            a.href = url;
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    }
+})();

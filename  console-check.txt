@@ -1,0 +1,38 @@
+Total messages: 36 (Errors: 10, Warnings: 0)
+
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***nonymous, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***nonymous, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***nonymous, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ https://hackmd.io/?nav=overview:0
+[VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ https://hackmd.io/?nav=overview:0
+[VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ https://hackmd.io/?nav=overview:0
+[VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ https://hackmd.io/?nav=overview:0
+[VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ https://hackmd.io/?nav=overview:0
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folder transport is pure v2 {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: } @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] v2 FolderCoreAPI constructed {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , transport: v2} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] v2 provider init {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, room: ***3decf7f684, autoConnect: true, userId: ***ecf7f684} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] socket provider create {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, room: ***ecf7f684, url: https://hackmd.io, path: /y-socket.io} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] v2 provider status {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, room: ***3decf7f684, status: connected} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] v2 provider sync event {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, room: ***3decf7f684, state: true, msSinceCtor: 158} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] v2 initial sync handler fired {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, msSinceCtor: 158, providerConnected: true, providerSynced: true} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folder sync state changed {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , sync: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] v2 received sync-step-1 {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, room: ***3decf7f684, msSinceCtor: 164} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folderApiStore.update called {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , force: false} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[INFO] [folder] folder sync state changed {folderTraceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, traceId: a8dd8a96-db01-423c-b141-a9ad3101c2b7, userId: ***ecf7f684, teamId: , sync: true} @ https://browser.sentry-cdn.com/5.15.5/bundle.min.js:1
+[ERROR] Failed to load resource: the server responded with a status of 400 () @ https://realtime.cloud.gist.build/api/v3/sse?userToken=Yzk5N2NiYzAtOGI5Yy00Y2M0LWJlZjAtMDYzZGVjZjdmNjg0&siteId=9947d0d46b7ece25dea7&sessionId=b23055df-80a1-49ef-b28c-8366c74f1f9b:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/r1eqRIP-kg.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/ByzQmwCJJl.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/SkF-mvCykx.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/SkF-mvCykx.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/ByzQmwCJJl.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/r1eqRIP-kg.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/SkF-mvCykx.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/ByzQmwCJJl.png:0
+[ERROR] Failed to load resource: the server responded with a status of 403 () @ https://hackmd.io/_uploads/r1eqRIP-kg.png:0

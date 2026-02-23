@@ -29,6 +29,22 @@ You can utilize some methods and combine them.
 
 ![](img/HackMDsearch_ss4.png)
 
+### Search Results Page
+Search results are displayed on the HackMD search results page (`?nav=search&q=...`). Results are paginated with 50 items per page by default.
+
+検索結果はHackMDの検索結果ページ（`?nav=search&q=...`）に表示されます。デフォルトで50件ごとにページングされます。
+
+### Options
+On the option page, you can configure the following settings:
+
+- **Results per page**: Number of search results to display per page (20, 50, 100, or 200 items)
+- **Hide upgrade ads**: Hide "Upgrade to Prime" advertisement on the search results page (enabled by default)
+
+オプションページでは以下の設定が可能です：
+
+- **Results per page**: 1ページあたりの検索結果表示件数（20, 50, 100, 200件）
+- **Hide upgrade ads**: 検索結果ページの「Upgrade to Prime」広告を非表示にする（デフォルトで有効）
+
 ### Download and View Stored Notes
 On the option page, you can **view and download sotred notes even offline or under the HackMD server crush**.
 
